@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class AuthService {
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: 'http://192.168.1.105:5069/api',
+      baseUrl: 'https://kuafor-019f.onrender.com/api',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30), // upload için biraz daha uzun
     ),
