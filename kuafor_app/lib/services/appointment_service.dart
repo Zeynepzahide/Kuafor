@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class AppointmentService {
-  static const String _base = 'http://192.168.1.105:5069/api/Appointment';
+  static const String _base = 'https://kuafor-019f.onrender.com/api/Appointment';
   final AuthService _authService = AuthService();
 
   Future<Map<String, String>> _headers() async {
