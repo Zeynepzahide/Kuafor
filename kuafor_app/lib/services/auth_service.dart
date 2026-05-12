@@ -23,9 +23,14 @@ class AuthService {
         return token;
       }
       return null;
-    } on DioException catch (e) {
-      print('Login Dio hatası: ${e.response?.data ?? e.message}');
-      return null;
+   } on DioException catch (e) {
+  print('REGISTER ERROR TYPE: ${e.type}');
+  print('REGISTER STATUS: ${e.response?.statusCode}');
+  print('REGISTER DATA: ${e.response?.data}');
+  print('REGISTER MESSAGE: ${e.message}');
+  print('REGISTER URL: ${e.requestOptions.uri}');
+  return false;
+}
     } catch (e) {
       print('Login genel hata: $e');
       return null;
