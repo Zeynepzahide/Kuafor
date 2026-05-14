@@ -53,6 +53,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Kuafor API", Version = "v1" });
@@ -89,19 +90,23 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// ✅ CORS en üstte
+app.UseCors("AllowAll");
+
+// ✅ HttpsRedirection CORS'tan sonra
 app.UseHttpsRedirection();
 
 var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
 Directory.CreateDirectory(wwwrootPath);
 Directory.CreateDirectory(Path.Combine(wwwrootPath, "uploads", "profiles"));
 Directory.CreateDirectory(Path.Combine(wwwrootPath, "uploads", "posts"));
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath),
     RequestPath = ""
 });
 
-app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
