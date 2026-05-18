@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace KuaforApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260403115949_AddStylistIdToService")]
-    partial class AddStylistIdToService
+    [Migration("20260518103751_InitialClean")]
+    partial class InitialClean
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,13 +33,22 @@ namespace KuaforApi.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("AppointmentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer");
 
-                    b.Property<int>("EmployeeId")
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SalonId")
                         .HasColumnType("integer");
 
                     b.Property<int>("ServiceId")
@@ -49,13 +58,18 @@ namespace KuaforApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("StylistId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("SalonId");
 
                     b.HasIndex("ServiceId");
+
+                    b.HasIndex("StylistId");
 
                     b.ToTable("Appointments");
                 });
@@ -67,6 +81,9 @@ namespace KuaforApi.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -152,6 +169,66 @@ namespace KuaforApi.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("KuaforApi.Models.Post", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalonId");
+
+                    b.ToTable("Posts");
+                });
+
+            modelBuilder.Entity("KuaforApi.Models.PostImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tag")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PostId");
+
+                    b.ToTable("PostImages");
+                });
+
             modelBuilder.Entity("KuaforApi.Models.Review", b =>
                 {
                     b.Property<int>("Id")
@@ -202,6 +279,12 @@ namespace KuaforApi.Migrations
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -249,6 +332,37 @@ namespace KuaforApi.Migrations
                     b.ToTable("Services");
                 });
 
+            modelBuilder.Entity("KuaforApi.Models.StylistAvailability", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeSpan>("CloseTime")
+                        .HasColumnType("interval");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsOpen")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeSpan>("OpenTime")
+                        .HasColumnType("interval");
+
+                    b.Property<int>("StylistId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StylistId", "DayOfWeek")
+                        .IsUnique();
+
+                    b.ToTable("StylistAvailabilities");
+                });
+
             modelBuilder.Entity("KuaforApi.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -284,6 +398,9 @@ namespace KuaforApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email")
+                        .IsUnique();
+
                     b.ToTable("Users");
                 });
 
@@ -292,26 +409,34 @@ namespace KuaforApi.Migrations
                     b.HasOne("KuaforApi.Models.User", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("KuaforApi.Models.Employee", "Employee")
+                    b.HasOne("KuaforApi.Models.Salon", "Salon")
                         .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("KuaforApi.Models.Service", "Service")
                         .WithMany()
                         .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KuaforApi.Models.User", "Stylist")
+                        .WithMany()
+                        .HasForeignKey("StylistId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Customer");
 
-                    b.Navigation("Employee");
+                    b.Navigation("Salon");
 
                     b.Navigation("Service");
+
+                    b.Navigation("Stylist");
                 });
 
             modelBuilder.Entity("KuaforApi.Models.Campaign", b =>
@@ -351,6 +476,28 @@ namespace KuaforApi.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("KuaforApi.Models.Post", b =>
+                {
+                    b.HasOne("KuaforApi.Models.Salon", "Salon")
+                        .WithMany()
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("KuaforApi.Models.PostImage", b =>
+                {
+                    b.HasOne("KuaforApi.Models.Post", "Post")
+                        .WithMany("Images")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("KuaforApi.Models.Review", b =>
@@ -396,6 +543,22 @@ namespace KuaforApi.Migrations
                     b.Navigation("Salon");
 
                     b.Navigation("Stylist");
+                });
+
+            modelBuilder.Entity("KuaforApi.Models.StylistAvailability", b =>
+                {
+                    b.HasOne("KuaforApi.Models.User", "Stylist")
+                        .WithMany()
+                        .HasForeignKey("StylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Stylist");
+                });
+
+            modelBuilder.Entity("KuaforApi.Models.Post", b =>
+                {
+                    b.Navigation("Images");
                 });
 
             modelBuilder.Entity("KuaforApi.Models.Salon", b =>
