@@ -37,9 +37,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Ayarlar'),
-        backgroundColor: Colors.purple,
+        backgroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -52,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.notifications, color: Colors.purple),
+                      const Icon(Icons.notifications, color: Colors.black),
                       const SizedBox(width: 8),
                       const Text(
                         'Firebase Cloud Messaging',
@@ -97,7 +98,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: const Icon(Icons.copy),
                       label: const Text('Token\'ı Kopyala'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ),
