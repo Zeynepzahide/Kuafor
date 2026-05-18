@@ -2,11 +2,13 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 COPY . .
-RUN dotnet publish -c Release -o /app
+
+WORKDIR /src/KuaforApi
+RUN dotnet publish KuaforApi.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 
-COPY --from=build /app .
+COPY --from=build /app/publish .
 
-CMD ["dotnet", "KuaforApi.dll"]
+ENTRYPOINT ["dotnet", "KuaforApi.dll"]
