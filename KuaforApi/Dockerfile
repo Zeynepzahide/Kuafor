@@ -3,10 +3,8 @@ WORKDIR /src
 
 COPY . .
 
-WORKDIR /src/KuaforApi
-
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet restore KuaforApi.csproj
+RUN dotnet publish KuaforApi.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
