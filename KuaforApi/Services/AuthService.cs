@@ -19,41 +19,41 @@ namespace KuaforApi.Services
             _configuration = configuration;
         }
 
-        // Kullanıcı kaydı (Register)
+        // Kullanıcı kaydı
         public bool Register(User user, string password)
         {
-            // 1. Aynı email varsa kaydetme
+            // Aynı email varsa kaydetme
             if (_context.Users.Any(u => u.Email == user.Email))
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(user.Username) &&
-                _context.Users.Any(u => u.Username == user.Username))
-                return false;
-
-            // 2. Şifreyi hash’le
+            // Şifreyi hashle
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
-            // 3. Kaydet
+            // Kaydet
             _context.Users.Add(user);
             _context.SaveChanges();
+
             return true;
         }
 
-        // Giriş yapma (Login)
-        public User? Login(string identifier, string password)
+        // Giriş yapma
+        public User? Login(string email, string password)
         {
-            var normalized = identifier.Trim();
-            var user = _context.Users.FirstOrDefault(u =>
-                u.Email == normalized || u.Username == normalized);
+            var user = _context.Users
+                .FirstOrDefault(u => u.Email == email);
+
             if (user == null)
                 return null;
 
-            // Şifreyi doğrula
-            bool isValid = BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+            bool isValid = BCrypt.Net.BCrypt.Verify(
+                password,
+                user.PasswordHash
+            );
+
             return isValid ? user : null;
         }
 
-        // JWT Token oluşturma
+        // JWT üret
         public string GenerateJwtToken(User user)
         {
             var claims = new[]
@@ -75,7 +75,11 @@ namespace KuaforApi.Services
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtKey)
             );
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var creds = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
 
             var token = new JwtSecurityToken(
                 issuer: "KuaforApi",
