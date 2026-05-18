@@ -58,6 +58,21 @@ class AppointmentService {
     return [];
   }
 
+  List<DateTime> parseBusySlotDates(List<dynamic> slots) {
+    return slots.map<DateTime?>((slot) {
+      try {
+        if (slot is Map) {
+          final raw = slot['appointmentDate'] ?? slot['AppointmentDate'];
+          if (raw == null) return null;
+          return DateTime.parse(raw.toString()).toLocal();
+        }
+        return DateTime.parse(slot.toString()).toLocal();
+      } catch (_) {
+        return null;
+      }
+    }).whereType<DateTime>().toList();
+  }
+
   Future<({Map? data, String? error})> createAppointment({
     required int customerId,
     required int stylistId,

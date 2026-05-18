@@ -12,12 +12,26 @@ var connectionString =
     Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Database connection string is missing. Set ConnectionStrings__DefaultConnection on Render or in local user secrets.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<EmailService>();
 
-var jwtKey = "this_is_a_very_strong_secret_key_1234567890";
+var jwtKey =
+    Environment.GetEnvironmentVariable("Jwt__Key")
+    ?? builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    jwtKey = "this_is_a_very_strong_secret_key_1234567890";
+}
 var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(options =>
@@ -109,5 +123,11 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "ok",
+    service = "KuaforApi",
+    timestamp = DateTime.UtcNow
+}));
 app.MapControllers();
 app.Run();
