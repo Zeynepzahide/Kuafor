@@ -8,6 +8,8 @@ public class User
 
     public string Email { get; set; } = string.Empty;
 
+    public string? Username { get; set; }
+
     public string PasswordHash { get; set; } = string.Empty;
 
     // owner / employee / customer
@@ -21,4 +23,10 @@ public class User
 
     // Puan ortalaması
     public double Rating { get; set; } = 0;
+
+    public string? AuthProvider { get; set; }
+
+    public string? ProviderId { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

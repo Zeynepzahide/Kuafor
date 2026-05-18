@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   final Dio _dio = Dio(
@@ -16,14 +18,15 @@ class AuthService {
   // ================= LOGIN =================
 
   Future<String?> login(
-      String email,
+      String identifier,
       String password,
       ) async {
     try {
       final response = await _dio.post(
         '/Auth/login',
         data: {
-          'email': email,
+          'identifier': identifier,
+          'email': identifier,
           'password': password,
         },
       );
@@ -62,6 +65,7 @@ class AuthService {
     required String email,
     required String password,
     required String role,
+    String? username,
     String? salonName,
     String? salonAddress,
     double? salonLatitude,
@@ -71,6 +75,8 @@ class AuthService {
       final data = <String, dynamic>{
         'fullName': fullName,
         'email': email,
+        if (username != null && username.isNotEmpty)
+          'username': username,
         'password': password,
         'role': role,
         if (salonName != null)
@@ -110,6 +116,88 @@ class AuthService {
     } catch (e) {
       print('Register genel hata: $e');
       return false;
+    }
+  }
+
+  // ================= SOCIAL LOGIN =================
+
+  Future<String?> signInWithGoogle() async {
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return null;
+
+      return _socialLogin(
+        provider: 'Google',
+        providerId: googleUser.id,
+        email: googleUser.email,
+        fullName: googleUser.displayName ?? googleUser.email.split('@').first,
+      );
+    } catch (e) {
+      print('Google giriş hatası: $e');
+      return null;
+    }
+  }
+
+  Future<String?> signInWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final email = credential.email;
+      if (email == null || email.isEmpty) return null;
+
+      final fullName = [
+        credential.givenName,
+        credential.familyName,
+      ].whereType<String>().where((part) => part.isNotEmpty).join(' ');
+
+      return _socialLogin(
+        provider: 'Apple',
+        providerId: credential.userIdentifier ?? email,
+        email: email,
+        fullName: fullName.isEmpty ? email.split('@').first : fullName,
+      );
+    } catch (e) {
+      print('Apple giriş hatası: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _socialLogin({
+    required String provider,
+    required String providerId,
+    required String email,
+    required String fullName,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/Auth/social-login',
+        data: {
+          'provider': provider,
+          'providerId': providerId,
+          'email': email,
+          'fullName': fullName,
+        },
+      );
+
+      if (response.statusCode == 200 &&
+          response.data['token'] != null) {
+        final token = response.data['token'].toString();
+        await saveToken(token);
+        return token;
+      }
+
+      return null;
+    } on DioException catch (e) {
+      print('SOCIAL LOGIN DATA: ${e.response?.data}');
+      return null;
+    } catch (e) {
+      print('Social login genel hata: $e');
+      return null;
     }
   }
 
@@ -260,7 +348,7 @@ class AuthService {
       });
 
       final response = await _dio.post(
-        '/Users/upload-profile-photo',
+        '/Users/upload-photo',
         data: formData,
         options: Options(
           headers: {
@@ -271,9 +359,10 @@ class AuthService {
         ),
       );
 
-      if (response.statusCode == 200 &&
-          response.data['imageUrl'] != null) {
-        return response.data['imageUrl'];
+      if (response.statusCode == 200) {
+        return (response.data['profileImageUrl'] ??
+                response.data['imageUrl'])
+            ?.toString();
       }
 
       return null;

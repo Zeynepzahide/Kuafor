@@ -35,17 +35,17 @@ class _LoginPageState
   String? _errorMessage;
 
   Future<void> _login() async {
-    final email =
+    final identifier =
     _emailController.text.trim();
 
     final password =
     _passwordController.text.trim();
 
-    if (email.isEmpty ||
+    if (identifier.isEmpty ||
         password.isEmpty) {
       setState(() {
         _errorMessage =
-        "Lütfen e-posta ve şifre alanlarını doldurun.";
+        "Lütfen e-posta/kullanıcı adı ve şifre alanlarını doldurun.";
       });
 
       return;
@@ -58,17 +58,31 @@ class _LoginPageState
 
     final token =
     await _authService.login(
-      email,
+      identifier,
       password,
     );
 
     if (!mounted) return;
 
-    if (token != null &&
-        token.isNotEmpty) {
-      final user =
-      await _authService.getUserInfo(
-          token);
+    await _completeLogin(token);
+  }
+
+  Future<void> _socialLogin(Future<String?> Function() action) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final token = await action();
+
+    if (!mounted) return;
+
+    await _completeLogin(token);
+  }
+
+  Future<void> _completeLogin(String? token) async {
+    if (token != null && token.isNotEmpty) {
+      final user = await _authService.getUserInfo(token);
 
       if (!mounted) return;
 
@@ -131,7 +145,7 @@ class _LoginPageState
       setState(() {
         _isLoading = false;
         _errorMessage =
-        "E-posta veya şifre hatalı.";
+        "E-posta/kullanıcı adı veya şifre hatalı.";
       });
     }
   }
@@ -207,7 +221,7 @@ class _LoginPageState
 
                     const FieldLabel(
                         text:
-                        'E-posta'),
+                        'E-posta veya kullanıcı adı'),
 
                     const SizedBox(
                         height: 6),
@@ -216,7 +230,7 @@ class _LoginPageState
                       controller:
                       _emailController,
                       hint:
-                      'ornek@email.com',
+                      'ornek@email.com veya kullaniciadi',
                       keyboardType:
                       TextInputType
                           .emailAddress,
@@ -363,9 +377,9 @@ class _LoginPageState
 
                     SocialButtons(
                       onGoogleTap:
-                          () {},
+                          () => _socialLogin(_authService.signInWithGoogle),
                       onAppleTap:
-                          () {},
+                          () => _socialLogin(_authService.signInWithApple),
                     ),
 
                     const SizedBox(

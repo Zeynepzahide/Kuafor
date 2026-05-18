@@ -61,6 +61,9 @@ namespace KuaforApi.Data
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
 
             modelBuilder.Entity<StylistAvailability>()
                 .HasIndex(a => new { a.StylistId, a.DayOfWeek })
