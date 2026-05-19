@@ -30,18 +30,23 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Kuaför Uygulaması',
 
-      // ───── TEMA DÜZELTİLDİ ─────
+      // ───────── TEMA ─────────
       theme: ThemeData(
         useMaterial3: true,
 
+        // TÜM UYGULAMA BEYAZ
         scaffoldBackgroundColor: Colors.white,
+        canvasColor: Colors.white,
+        cardColor: Colors.white,
 
         colorScheme: const ColorScheme.light(
           primary: Color(0xFF0B132B),
           secondary: Color(0xFFB08D57),
           surface: Colors.white,
+          background: Colors.white,
         ),
 
+        // APPBAR
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF0B132B),
           foregroundColor: Colors.white,
@@ -49,65 +54,116 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
 
-        bottomSheetTheme: const BottomSheetThemeData(
+        // BOTTOM SHEET
+        bottomSheetTheme:
+            const BottomSheetThemeData(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          modalBackgroundColor: Colors.white,
+        ),
+
+        // DIALOG
+        dialogTheme: const DialogTheme(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.white,
         ),
 
-        dialogTheme: const DialogTheme(
-          backgroundColor: Colors.white,
+        // CARD
+        cardTheme: CardTheme(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(16),
+          ),
         ),
 
-        cardColor: Colors.white,
-
-        canvasColor: Colors.white,
-
-        dividerColor: Color(0xFFEAEAEA),
-
+        // FLOATING BUTTON
         floatingActionButtonTheme:
             const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFFB08D57),
+          backgroundColor:
+              Color(0xFFB08D57),
           foregroundColor: Colors.white,
         ),
 
-        elevatedButtonTheme: ElevatedButtonThemeData(
+        // BUTTON
+        elevatedButtonTheme:
+            ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFB08D57),
+            backgroundColor:
+                const Color(0xFFB08D57),
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius:
+                  BorderRadius.circular(12),
             ),
           ),
         ),
 
-        inputDecorationTheme: InputDecorationTheme(
+        // INPUT
+        inputDecorationTheme:
+            InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
+
+          contentPadding:
+              const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
           ),
+
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius:
+                BorderRadius.circular(12),
             borderSide: BorderSide(
               color: Colors.grey.shade300,
             ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+
+          enabledBorder:
+              OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(12),
             borderSide: BorderSide(
               color: Colors.grey.shade300,
             ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
+
+          focusedBorder:
+              OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(
               color: Color(0xFFB08D57),
               width: 1.5,
             ),
           ),
         ),
+
+        // TABBAR
+        tabBarTheme: const TabBarTheme(
+          labelColor: Color(0xFF0B132B),
+          unselectedLabelColor:
+              Colors.grey,
+          indicatorColor:
+              Color(0xFFB08D57),
+        ),
+
+        // SNACKBAR
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor:
+              Colors.grey.shade900,
+          contentTextStyle:
+              const TextStyle(
+            color: Colors.white,
+          ),
+        ),
+
+        // DIVIDER
+        dividerColor:
+            const Color(0xFFEAEAEA),
       ),
 
       home: const SplashDecider(),
@@ -115,7 +171,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class SplashDecider extends StatefulWidget {
+class SplashDecider
+    extends StatefulWidget {
   const SplashDecider({super.key});
 
   @override
@@ -149,7 +206,8 @@ class _SplashDeciderState
     }
 
     final user =
-        await _authService.getUserInfo(token);
+        await _authService
+            .getUserInfo(token);
 
     if (user == null) {
       await _authService.deleteToken();
