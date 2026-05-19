@@ -584,3 +584,156 @@ class _ProfilePageState
     );
   }
 }
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: 18,
+        horizontal: 12,
+      ),
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+
+        borderRadius:
+            BorderRadius.circular(18),
+
+        boxShadow: [
+          BoxShadow(
+            color:
+                Colors.black.withOpacity(
+                    0.04),
+
+            blurRadius: 10,
+          ),
+        ],
+      ),
+
+      child: Column(
+        children: [
+
+          Text(
+            value,
+
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight:
+                  FontWeight.bold,
+
+              color:
+                  AppColors.mainDark,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            label,
+
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileButton extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const _ProfileButton({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+
+      borderRadius:
+          BorderRadius.circular(16),
+
+      child: InkWell(
+        borderRadius:
+            BorderRadius.circular(16),
+
+        onTap: onTap,
+
+        child: Container(
+          padding:
+              const EdgeInsets.all(18),
+
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(
+                    16),
+
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(0.03),
+
+                blurRadius: 8,
+              ),
+            ],
+          ),
+
+          child: Row(
+            children: [
+
+              CircleAvatar(
+                radius: 20,
+
+                backgroundColor:
+                    AppColors.accent,
+
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Text(
+                  title,
+
+                  style:
+                      const TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                        FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
