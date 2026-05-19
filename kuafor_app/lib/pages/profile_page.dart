@@ -546,7 +546,6 @@ class _ProfilePageState
                     ),
                   ),
                 ),
-=
 
                 SliverToBoxAdapter(
                   child: Padding(
