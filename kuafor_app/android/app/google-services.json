@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "857644343778",
-    "project_id": "kuaforapp12345",
-    "storage_bucket": "kuaforapp12345.firebasestorage.app"
+    "project_number": "539398445512",
+    "project_id": "kuaforapp-56dcf",
+    "storage_bucket": "kuaforapp-56dcf.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:857644343778:android:08d3e955827bdf604b59bb",
+        "mobilesdk_app_id": "1:539398445512:android:f0188901d3e15c857488fd",
         "android_client_info": {
           "package_name": "com.example.kuafor_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyACvVQtCxQTvJ169pA50mC3Ibtt53S6WNw"
+          "current_key": "AIzaSyAgUqHqqziO_cTE-qlugChIZox959kkRh8"
         }
       ],
       "services": {

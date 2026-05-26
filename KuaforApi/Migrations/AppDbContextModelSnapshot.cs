@@ -386,6 +386,12 @@ namespace KuaforApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasColumnType("text");
+
                     b.Property<string>("ProfileImageUrl")
                         .HasColumnType("text");
 

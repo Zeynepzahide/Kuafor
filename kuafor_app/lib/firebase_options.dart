@@ -50,19 +50,19 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyACvVQtCxQTvJ169pA50mC3Ibtt53S6WNw',
-    appId: '1:857644343778:android:08d3e955827bdf604b59bb',
-    messagingSenderId: '857644343778',
-    projectId: 'kuaforapp12345',
-    storageBucket: 'kuaforapp12345.firebasestorage.app',
+    apiKey: 'AIzaSyAgUqHqqziO_cTE-qlugChIZox959kkRh8',
+    appId: '1:539398445512:android:f0188901d3e15c857488fd',
+    messagingSenderId: '539398445512',
+    projectId: 'kuaforapp-56dcf',
+    storageBucket: 'kuaforapp-56dcf.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCuTRLDfzPUpSAFdrBX84_3U4jQoa0z0aA',
-    appId: '1:857644343778:ios:02c92730b57187a44b59bb',
-    messagingSenderId: '857644343778',
-    projectId: 'kuaforapp12345',
-    storageBucket: 'kuaforapp12345.firebasestorage.app',
+    apiKey: 'AIzaSyBk35-nuj0lYRAwAhOSJHhZBl9XX4yJznY',
+    appId: '1:539398445512:ios:35477c62c7680f267488fd',
+    messagingSenderId: '539398445512',
+    projectId: 'kuaforapp-56dcf',
+    storageBucket: 'kuaforapp-56dcf.firebasestorage.app',
     iosBundleId: 'com.example.kuaforApp',
   );
 

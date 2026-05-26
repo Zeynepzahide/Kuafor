@@ -28,5 +28,9 @@ public class User
 
     public string? ProviderId { get; set; }
 
+    public string? PasswordResetTokenHash { get; set; }
+
+    public DateTime? PasswordResetTokenExpiresAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

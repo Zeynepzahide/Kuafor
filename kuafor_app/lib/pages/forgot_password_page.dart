@@ -13,6 +13,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _emailController = TextEditingController();
   final _authService = AuthService();
   String? _message;
+  bool _isSuccess = false;
   bool _isLoading = false;
 
   Future<void> _sendResetLink() async {
@@ -32,15 +33,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() {
       _isLoading = true;
       _message = null;
+      _isSuccess = false;
     });
 
-    final message = await _authService.forgotPassword(email);
+    final result = await _authService.forgotPassword(email);
 
     if (!mounted) return;
 
     setState(() {
       _isLoading = false;
-      _message = message;
+      _message = result.message;
+      _isSuccess = result.isSuccess;
     });
   }
 
@@ -77,8 +80,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.arrow_back_ios_new_rounded,
-                              size: 16, color: AppColors.primary),
+                          Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'Girişe dön',
@@ -99,6 +105,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       controller: _emailController,
                       hint: 'ornek@email.com',
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _sendResetLink(),
                       prefix: const Icon(
                         Icons.mail_outline_rounded,
                         size: 18,
@@ -108,21 +116,40 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: 18),
 
                     if (_message != null) ...[
-                      ErrorBanner(message: _message!),
+                      _isSuccess
+                          ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              _message!,
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                          : ErrorBanner(message: _message!),
                       const SizedBox(height: 14),
                     ],
 
                     _isLoading
                         ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
+                          child: CircularProgressIndicator(
+                            color: AppColors.accent,
+                            strokeWidth: 2,
+                          ),
+                        )
                         : PrimaryButton(
-                      label: 'Sıfırlama bağlantısı gönder',
-                      onTap: _sendResetLink,
-                    ),
+                          label: 'Sıfırlama bağlantısı gönder',
+                          onTap: _sendResetLink,
+                        ),
                   ],
                 ),
               ),

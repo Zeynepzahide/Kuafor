@@ -536,30 +536,32 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fallback = Center(
+      child: Text(
+        _initials,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+    );
+
     return Container(
       width: 42, height: 42,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white.withOpacity(0.15),
         border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
-        image: imageUrl.isNotEmpty
-            ? DecorationImage(
-                image: NetworkImage(imageUrl),
-                fit: BoxFit.cover,
-              )
-            : null,
       ),
       child: imageUrl.isEmpty
-          ? Center(
-              child: Text(
-                _initials,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700),
+          ? fallback
+          : ClipOval(
+              child: Image.network(
+                imageUrl,
+                width: 42,
+                height: 42,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => fallback,
               ),
-            )
-          : null,
+            ),
     );
   }
 }

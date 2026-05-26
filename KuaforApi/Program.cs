@@ -158,10 +158,11 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapGet("/health", () => Results.Ok(new
+app.MapGet("/health", (EmailService emailService) => Results.Ok(new
 {
     status = "ok",
     service = "KuaforApi",
+    smtpConfigured = emailService.IsConfigured,
     timestamp = DateTime.UtcNow
 }));
 app.MapControllers();
@@ -174,6 +175,8 @@ static void RepairRenderSchema(AppDbContext db)
             ADD COLUMN IF NOT EXISTS "Username" text,
             ADD COLUMN IF NOT EXISTS "AuthProvider" text,
             ADD COLUMN IF NOT EXISTS "ProviderId" text,
+            ADD COLUMN IF NOT EXISTS "PasswordResetTokenHash" text,
+            ADD COLUMN IF NOT EXISTS "PasswordResetTokenExpiresAt" timestamp with time zone NULL,
             ADD COLUMN IF NOT EXISTS "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW();
 
         ALTER TABLE IF EXISTS "Campaigns"

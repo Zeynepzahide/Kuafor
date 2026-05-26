@@ -6,15 +6,15 @@ import 'pages/salon_owner_home_page.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await NotificationService().initLocalNotifications();
-
-  if (!kIsWeb) {
-    await FirebaseService().initialize();
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const MyApp());
 }

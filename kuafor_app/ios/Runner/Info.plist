@@ -26,8 +26,6 @@
     <true/>
 
     <!-- Google Maps API Key -->
-    <key>GIDClientID</key>
-    <string>AIzaSyDE-q2OLeUxE4gra1mtdG2pgnZqvwGeddU</string>
 
     <!-- Konum izin açıklamaları — iOS zorunlu tutar -->
     <key>NSLocationWhenInUseUsageDescription</key>
@@ -56,5 +54,16 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.539398445512-itphk5qr4ufstgja39f8bq6b405u8evm</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
