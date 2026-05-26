@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -41,16 +42,16 @@ class AuthService {
           _messageFromDio(e) ??
           'Giriş yapılamadı. Sunucu bağlantısını kontrol edin.';
 
-      print('LOGIN ERROR TYPE: ${e.type}');
-      print('LOGIN STATUS: ${e.response?.statusCode}');
-      print('LOGIN DATA: ${e.response?.data}');
-      print('LOGIN MESSAGE: ${e.message}');
-      print('LOGIN URL: ${e.requestOptions.uri}');
+      debugPrint('LOGIN ERROR TYPE: ${e.type}');
+      debugPrint('LOGIN STATUS: ${e.response?.statusCode}');
+      debugPrint('LOGIN DATA: ${e.response?.data}');
+      debugPrint('LOGIN MESSAGE: ${e.message}');
+      debugPrint('LOGIN URL: ${e.requestOptions.uri}');
 
       return null;
     } catch (e) {
       lastAuthError = 'Giriş sırasında beklenmeyen bir hata oluştu.';
-      print('Login genel hata: $e');
+      debugPrint('Login genel hata: $e');
       return null;
     }
   }
@@ -86,24 +87,24 @@ class AuthService {
 
       final response = await _dio.post('/Auth/register', data: data);
 
-      print('REGISTER STATUS: ${response.statusCode}');
-      print('REGISTER BODY: ${response.data}');
+      debugPrint('REGISTER STATUS: ${response.statusCode}');
+      debugPrint('REGISTER BODY: ${response.data}');
 
       return response.statusCode == 200 || response.statusCode == 201;
     } on DioException catch (e) {
       lastAuthError =
           _messageFromDio(e) ?? 'Kayıt yapılamadı. Lütfen tekrar deneyin.';
 
-      print('REGISTER ERROR TYPE: ${e.type}');
-      print('REGISTER STATUS: ${e.response?.statusCode}');
-      print('REGISTER DATA: ${e.response?.data}');
-      print('REGISTER MESSAGE: ${e.message}');
-      print('REGISTER URL: ${e.requestOptions.uri}');
+      debugPrint('REGISTER ERROR TYPE: ${e.type}');
+      debugPrint('REGISTER STATUS: ${e.response?.statusCode}');
+      debugPrint('REGISTER DATA: ${e.response?.data}');
+      debugPrint('REGISTER MESSAGE: ${e.message}');
+      debugPrint('REGISTER URL: ${e.requestOptions.uri}');
 
       return false;
     } catch (e) {
       lastAuthError = 'Kayıt sırasında beklenmeyen bir hata oluştu.';
-      print('Register genel hata: $e');
+      debugPrint('Register genel hata: $e');
       return false;
     }
   }
@@ -163,15 +164,15 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       lastAuthError = 'Firebase Google giriş hatası: ${e.message}';
 
-      print('FIREBASE GOOGLE ERROR CODE: ${e.code}');
-      print('FIREBASE GOOGLE ERROR MESSAGE: ${e.message}');
+      debugPrint('FIREBASE GOOGLE ERROR CODE: ${e.code}');
+      debugPrint('FIREBASE GOOGLE ERROR MESSAGE: ${e.message}');
 
       return null;
     } catch (e) {
       lastAuthError =
           'Google ile giriş başlatılamadı. Firebase ve SHA-1 ayarlarını kontrol edin.';
 
-      print('GOOGLE LOGIN ERROR: $e');
+      debugPrint('GOOGLE LOGIN ERROR: $e');
 
       return null;
     }
@@ -208,14 +209,14 @@ class AuthService {
       lastAuthError =
           _messageFromDio(e) ?? 'Sosyal giriş sunucu tarafında tamamlanamadı.';
 
-      print('SOCIAL LOGIN STATUS: ${e.response?.statusCode}');
-      print('SOCIAL LOGIN DATA: ${e.response?.data}');
-      print('SOCIAL LOGIN URL: ${e.requestOptions.uri}');
+      debugPrint('SOCIAL LOGIN STATUS: ${e.response?.statusCode}');
+      debugPrint('SOCIAL LOGIN DATA: ${e.response?.data}');
+      debugPrint('SOCIAL LOGIN URL: ${e.requestOptions.uri}');
 
       return null;
     } catch (e) {
       lastAuthError = 'Sosyal giriş sırasında beklenmeyen bir hata oluştu.';
-      print('Social login genel hata: $e');
+      debugPrint('Social login genel hata: $e');
       return null;
     }
   }
@@ -270,10 +271,12 @@ class AuthService {
 
       return null;
     } on DioException catch (e) {
-      print('Kullanıcı bilgisi Dio hatası: ${e.response?.data ?? e.message}');
+      debugPrint(
+        'Kullanıcı bilgisi Dio hatası: ${e.response?.data ?? e.message}',
+      );
       return null;
     } catch (e) {
-      print('Kullanıcı bilgisi genel hata: $e');
+      debugPrint('Kullanıcı bilgisi genel hata: $e');
       return null;
     }
   }
@@ -295,10 +298,10 @@ class AuthService {
 
       return response.statusCode == 200;
     } on DioException catch (e) {
-      print('Update profile Dio hatası: ${e.response?.data ?? e.message}');
+      debugPrint('Update profile Dio hatası: ${e.response?.data ?? e.message}');
       return false;
     } catch (e) {
-      print('Update profile genel hata: $e');
+      debugPrint('Update profile genel hata: $e');
       return false;
     }
   }
@@ -332,10 +335,10 @@ class AuthService {
 
       return null;
     } on DioException catch (e) {
-      print('UPLOAD PHOTO ERROR: ${e.response?.data}');
+      debugPrint('UPLOAD PHOTO ERROR: ${e.response?.data}');
       return null;
     } catch (e) {
-      print('UPLOAD PHOTO GENERAL ERROR: $e');
+      debugPrint('UPLOAD PHOTO GENERAL ERROR: $e');
       return null;
     }
   }
