@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+<<<<<<< HEAD
 import 'package:shared_preferences/shared_preferences.dart';
+=======
+
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
 import '../services/appointment_service.dart';
 import '../services/auth_service.dart';
 import '../services/campaign_service.dart';
 import '../services/review_service.dart';
+
 import '../widgets/app_widgets.dart';
+
 import 'login_page.dart';
 
 const _supportEmail = 'kuafor.destek@gmail.com';
@@ -17,30 +23,51 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfilePage> createState() =>
+      _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  final AuthService _authService = AuthService();
-  final AppointmentService _appointmentService = AppointmentService();
-  final ReviewService _reviewService = ReviewService();
-  final CampaignService _campaignService = CampaignService();
-  final ImagePicker _picker = ImagePicker();
+class _ProfilePageState
+    extends State<ProfilePage> {
+  final AuthService _authService =
+      AuthService();
+
+  final AppointmentService
+      _appointmentService =
+      AppointmentService();
+
+  final ReviewService
+      _reviewService =
+      ReviewService();
+
+  final CampaignService
+      _campaignService =
+      CampaignService();
+
+  final ImagePicker _picker =
+      ImagePicker();
 
   String name = "";
   String email = "";
   String role = "";
+
   int _userId = 0;
+
   int _appointmentCount = 0;
   int _reviewCount = 0;
   int _campaignCount = 0;
+
+  double _averageRating = 0;
+
   String _profileImageUrl = "";
 
   bool _isLoading = true;
   bool _isLoggingOut = false;
   bool _uploadingPhoto = false;
+
   bool _notifOn = true;
   bool _campaignNotif = false;
+
   String? _errorMessage;
 
   @override
@@ -50,6 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUser();
   }
 
+<<<<<<< HEAD
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -58,6 +86,8 @@ class _ProfilePageState extends State<ProfilePage> {
       _campaignNotif = prefs.getBool(_campaignNotificationsPrefKey) ?? false;
     });
   }
+=======
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
 
   Future<void> _loadUser() async {
     setState(() {
@@ -65,63 +95,165 @@ class _ProfilePageState extends State<ProfilePage> {
       _errorMessage = null;
     });
 
-    final token = await _authService.getToken();
-    if (token == null || token.isEmpty) {
+    final token =
+        await _authService.getToken();
+
+    if (token == null ||
+        token.isEmpty) {
       if (!mounted) return;
+
       setState(() {
         _isLoading = false;
-        _errorMessage = "Oturum bulunamadı. Lütfen tekrar giriş yapın.";
+
+        _errorMessage =
+            "Oturum bulunamadı.";
       });
+
       return;
     }
 
-    final user = await _authService.getUserInfo(token);
+    final user =
+        await _authService.getUserInfo(
+            token);
+
     if (!mounted) return;
 
     if (user != null) {
       setState(() {
+<<<<<<< HEAD
         name = user['name'] ?? '';
         _userId = user['id'] ?? 0;
         email = user['email'] ?? '';
         role = user['role'] ?? '';
         _profileImageUrl = user['profileImageUrl'] ?? '';
+=======
+        name =
+            user['name'] ?? '';
+
+        email =
+            user['email'] ?? '';
+
+        role =
+            user['role'] ?? '';
+
+        _userId =
+            user['id'] ?? 0;
+
+        _profileImageUrl =
+            user['profileImageUrl'] ??
+                '';
+
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
         _isLoading = false;
       });
+
       _loadStats();
     } else {
       setState(() {
         _isLoading = false;
+<<<<<<< HEAD
         _errorMessage = "Kullanıcı bilgileri alınamadı.";
+=======
+
+        _errorMessage =
+            "Kullanıcı bilgileri alınamadı.";
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
       });
     }
   }
 
+
   Future<void> _loadStats() async {
     if (_userId == 0) return;
+<<<<<<< HEAD
     final appointments = await _appointmentService.getCustomerAppointments(
       _userId,
     );
     final reviews = await _reviewService.getReviews();
     final campaigns = await _campaignService.getCampaigns();
+=======
+
+    final appointments =
+        await _appointmentService
+            .getCustomerAppointments(
+                _userId);
+
+    final reviews =
+        await _reviewService.getReviews();
+
+    final campaigns =
+        await _campaignService
+            .getCampaigns();
+
+    final myReviews = reviews
+        .where(
+          (r) =>
+              r['userId'] == _userId,
+        )
+        .toList();
+
+    double avg = 0;
+
+    if (myReviews.isNotEmpty) {
+      final total =
+          myReviews.fold<double>(
+        0,
+        (sum, r) =>
+            sum +
+            ((r['rating'] ?? 0)
+                    as num)
+                .toDouble(),
+      );
+
+      avg = total / myReviews.length;
+    }
+
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
     if (!mounted) return;
+
     setState(() {
-      _appointmentCount = appointments.length;
-      _reviewCount = reviews.where((r) => r['userId'] == _userId).length;
-      _campaignCount = campaigns.length;
+      _appointmentCount =
+          appointments.length;
+
+      _reviewCount =
+          myReviews.length;
+
+      _campaignCount =
+          campaigns.length;
+
+      _averageRating = avg;
     });
   }
 
+
   void _copyEmail() {
     if (email.isEmpty) return;
+<<<<<<< HEAD
     Clipboard.setData(ClipboardData(text: email));
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('E-posta kopyalandı')));
+=======
+
+    Clipboard.setData(
+      ClipboardData(text: email),
+    );
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content:
+            Text('E-posta kopyalandı'),
+      ),
+    );
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
   }
+
 
   void _showSupport() {
     showDialog(
       context: context,
+<<<<<<< HEAD
       builder:
           (_) => AlertDialog(
             title: const Text('Yardım & Destek'),
@@ -147,12 +279,60 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
+=======
+
+      builder: (_) => AlertDialog(
+        title: const Text(
+          'Yardım & Destek',
+        ),
+
+        content: GestureDetector(
+          onTap: () async {
+
+            await Clipboard.setData(
+              const ClipboardData(
+                text:
+                    'kuafor.destek@example.com',
+              ),
+            );
+
+            if (!mounted) return;
+
+            ScaffoldMessenger.of(
+                    context)
+                .showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Destek e-postası kopyalandı',
+                ),
+              ),
+            );
+          },
+
+          child: const Text(
+            'Destek için kuafor.destek@example.com adresine yazabilirsiniz.\n\nDokunarak kopyalayabilirsiniz.',
+          ),
+        ),
+
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context),
+
+            child: const Text(
+                'Tamam'),
+          ),
+        ],
+      ),
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
     );
   }
+
 
   void _showRateDialog() {
     showDialog(
       context: context,
+<<<<<<< HEAD
       builder:
           (_) => AlertDialog(
             title: const Text('Uygulamayı Değerlendir'),
@@ -205,10 +385,56 @@ class _ProfilePageState extends State<ProfilePage> {
               ? 'Kampanya bildirimleri açıldı'
               : 'Kampanya bildirimleri kapatıldı',
         ),
+=======
+
+      builder: (_) => AlertDialog(
+        title: const Text(
+          'Uygulamayı Değerlendir',
+        ),
+
+        content: const Text(
+          'Kuaför uygulamasını beğendiyseniz mağazada puanlayabilirsiniz ⭐',
+        ),
+
+        actions: [
+
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+
+            child: const Text(
+              'Daha Sonra',
+            ),
+          ),
+
+          ElevatedButton(
+            onPressed: () {
+
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(
+                      context)
+                  .showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Mağaza yönlendirmesi yakında eklenecek',
+                  ),
+                ),
+              );
+            },
+
+            child: const Text(
+              'Puan Ver',
+            ),
+          ),
+        ],
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
       ),
     );
   }
 
+<<<<<<< HEAD
   Future<void> _pickAndUploadPhoto() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -631,9 +857,50 @@ class _ProfilePageState extends State<ProfilePage> {
                           ],
                         ),
                       ),
+=======
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor:
+          Colors.white,
+
+      body: _isLoading
+          ? const Center(
+              child:
+                  CircularProgressIndicator(
+                color:
+                    AppColors.mainDark,
+                strokeWidth: 2,
+              ),
+            )
+          : CustomScrollView(
+              slivers: [
+
+
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin:
+                        const EdgeInsets
+                            .all(16),
+
+                    padding:
+                        const EdgeInsets
+                            .all(20),
+
+                    decoration:
+                        BoxDecoration(
+                      color: AppColors
+                          .mainDark,
+
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                                  24),
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
                     ),
                   ),
 
+<<<<<<< HEAD
                   // ── Profil kartı ─────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Container(
@@ -948,42 +1215,361 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ],
               ),
+=======
+                    child: Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+
+                        CircleAvatar(
+                          radius: 34,
+
+                          backgroundColor:
+                              Colors.white,
+
+                          backgroundImage:
+                              _profileImageUrl
+                                      .isNotEmpty
+                                  ? NetworkImage(
+                                      _profileImageUrl,
+                                    )
+                                  : null,
+
+                          child:
+                              _profileImageUrl
+                                      .isEmpty
+                                  ? Text(
+                                      name
+                                              .isNotEmpty
+                                          ? name[0]
+                                              .toUpperCase()
+                                          : '?',
+
+                                      style:
+                                          const TextStyle(
+                                        fontSize:
+                                            24,
+
+                                        fontWeight:
+                                            FontWeight
+                                                .bold,
+                                      ),
+                                    )
+                                  : null,
+                        ),
+
+                        const SizedBox(
+                            width: 16),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+
+                            children: [
+
+                              Text(
+                                name
+                                        .isNotEmpty
+                                    ? name
+                                    : 'Kullanıcı',
+
+                                style:
+                                    const TextStyle(
+                                  color: Colors
+                                      .white,
+
+                                  fontSize:
+                                      20,
+
+                                  fontWeight:
+                                      FontWeight
+                                          .bold,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                  height:
+                                      6),
+
+                              GestureDetector(
+                                onTap:
+                                    _copyEmail,
+
+                                child: Text(
+                                  email
+                                          .isNotEmpty
+                                      ? email
+                                      : '-',
+
+                                  style:
+                                      TextStyle(
+                                    color: Colors
+                                        .white
+                                        .withOpacity(
+                                            0.7),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(
+                                  height:
+                                      12),
+
+                              Container(
+                                padding:
+                                    const EdgeInsets
+                                        .symmetric(
+                                  horizontal:
+                                      12,
+                                  vertical:
+                                      6,
+                                ),
+
+                                decoration:
+                                    BoxDecoration(
+                                  color:
+                                      AppColors
+                                          .accent,
+
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                          20),
+                                ),
+
+                                child: Text(
+                                  role,
+
+                                  style:
+                                      const TextStyle(
+                                    color: Colors
+                                        .white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets
+                            .fromLTRB(
+                      16,
+                      0,
+                      16,
+                      0,
+                    ),
+
+                    child: Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+
+                        Expanded(
+                          child: _StatCard(
+                            label:
+                                'Randevu',
+
+                            value:
+                                '$_appointmentCount',
+                          ),
+                        ),
+
+                        const SizedBox(
+                            width: 8),
+
+                        Expanded(
+                          child: _StatCard(
+                            label:
+                                'Puan',
+
+                            value:
+                                _averageRating
+                                    .toStringAsFixed(
+                                        1),
+                          ),
+                        ),
+
+                        const SizedBox(
+                            width: 8),
+
+                        Expanded(
+                          child: _StatCard(
+                            label:
+                                'Kampanya',
+
+                            value:
+                                '$_campaignCount',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets
+                            .all(16),
+
+                    child: Column(
+                      children: [
+
+                        _ProfileButton(
+                          icon:
+                              Icons.support_agent,
+                          title:
+                              'Yardım & Destek',
+                          onTap:
+                              _showSupport,
+                        ),
+
+                        const SizedBox(
+                            height: 12),
+
+                        _ProfileButton(
+                          icon: Icons.star,
+                          title:
+                              'Uygulamayı Değerlendir',
+                          onTap:
+                              _showRateDialog,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
     );
   }
 }
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
 
-// ── Alt sheet ve yardımcı widget'lar (değişmedi) ──────────────────────────────
-
-class _EditBottomSheet extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-  final VoidCallback onSave;
-
-  const _EditBottomSheet({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-    required this.onSave,
+  const _StatCard({
+    required this.label,
+    required this.value,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: 18,
+        horizontal: 12,
+      ),
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+
+        borderRadius:
+            BorderRadius.circular(18),
+
+        boxShadow: [
+          BoxShadow(
+            color:
+                Colors.black.withOpacity(
+                    0.04),
+
+            blurRadius: 10,
+          ),
+        ],
+      ),
+
+      child: Column(
+        children: [
+
+          Text(
+            value,
+
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight:
+                  FontWeight.bold,
+
+              color:
+                  AppColors.mainDark,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            label,
+
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileButton extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const _ProfileButton({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+
+      borderRadius:
+          BorderRadius.circular(16),
+
+      child: InkWell(
+        borderRadius:
+            BorderRadius.circular(16),
+
+        onTap: onTap,
+
+        child: Container(
+          padding:
+              const EdgeInsets.all(18),
+
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(
+                    16),
+
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(0.03),
+
+                blurRadius: 8,
+              ),
+            ],
+          ),
+
+          child: Row(
             children: [
+<<<<<<< HEAD
               Center(
                 child: Container(
                   width: 42,
@@ -1053,6 +1639,41 @@ class _EditBottomSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+=======
+
+              CircleAvatar(
+                radius: 20,
+
+                backgroundColor:
+                    AppColors.accent,
+
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Text(
+                  title,
+
+                  style:
+                      const TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                        FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey,
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc
               ),
             ],
           ),
@@ -1060,6 +1681,7 @@ class _EditBottomSheet extends StatelessWidget {
       ),
     );
   }
+<<<<<<< HEAD
 }
 
 class _SheetTextField extends StatelessWidget {
@@ -1363,3 +1985,6 @@ class _ToggleRow extends StatelessWidget {
     );
   }
 }
+=======
+}
+>>>>>>> c43dd2a8ea7113452d53f01917820b11138885fc

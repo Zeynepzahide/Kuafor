@@ -20,7 +20,12 @@ namespace KuaforApi.Models
 
         public DateTime? EndDate { get; set; }
 
+        public int UsageLimit { get; set; } = 100;
+
+        public int UsedCount { get; set; } = 0;
+
         public int? SalonId { get; set; }
+
         public Salon? Salon { get; set; }
     }
 }
