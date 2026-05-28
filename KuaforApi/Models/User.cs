@@ -21,6 +21,12 @@ public class User
     // Profil fotoğrafı
     public string? ProfileImageUrl { get; set; }
 
+    public byte[]? ProfileImageData { get; set; }
+
+    public string? ProfileImageContentType { get; set; }
+
+    public DateTime? ProfileImageUpdatedAt { get; set; }
+
     // Puan ortalaması
     public double Rating { get; set; } = 0;
 

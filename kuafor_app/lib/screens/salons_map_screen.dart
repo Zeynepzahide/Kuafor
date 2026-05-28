@@ -46,7 +46,8 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
           position: LatLng(widget.userLat!, widget.userLng!),
           infoWindow: const InfoWindow(title: 'Konumunuz'),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueAzure),
+            BitmapDescriptor.hueAzure,
+          ),
         ),
       );
     }
@@ -66,10 +67,10 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
           position: LatLng(latVal, lngVal),
           infoWindow: InfoWindow(title: salon['name'] ?? 'Salon'),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueOrange),
+            BitmapDescriptor.hueOrange,
+          ),
           onTap: () {
-            setState(
-                () => _selectedSalon = Map<String, dynamic>.from(salon));
+            setState(() => _selectedSalon = Map<String, dynamic>.from(salon));
           },
         ),
       );
@@ -104,7 +105,8 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
     }
   }
 
-  int get _salonsWithCoords => widget.salons.where((s) {
+  int get _salonsWithCoords =>
+      widget.salons.where((s) {
         return s['latitude'] != null && s['longitude'] != null;
       }).length;
 
@@ -151,8 +153,7 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
           Expanded(
             child: ListView.builder(
               itemCount: widget.salons.length,
-              itemBuilder: (_, i) =>
-                  _buildSalonListTile(widget.salons[i]),
+              itemBuilder: (_, i) => _buildSalonListTile(widget.salons[i]),
             ),
           ),
         ],
@@ -166,20 +167,16 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
         _buildGoogleMap(),
         if (!_mapReady)
           const Center(
-            child:
-                CircularProgressIndicator(color: AppColors.accent),
+            child: CircularProgressIndicator(color: AppColors.accent),
           ),
-        if (_mapReady &&
-            widget.userLat != null &&
-            widget.userLng != null)
+        if (_mapReady && widget.userLat != null && widget.userLng != null)
           Positioned(
             bottom: _selectedSalon != null ? 200 : 24,
             right: 16,
             child: FloatingActionButton.small(
               backgroundColor: AppColors.primary,
               onPressed: _goToMyLocation,
-              child:
-                  const Icon(Icons.my_location, color: AppColors.white),
+              child: const Icon(Icons.my_location, color: AppColors.white),
             ),
           ),
         if (_selectedSalon != null)
@@ -202,10 +199,7 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
             _mapReady = true;
           });
         },
-        initialCameraPosition: CameraPosition(
-          target: _initialCenter,
-          zoom: 13,
-        ),
+        initialCameraPosition: CameraPosition(target: _initialCenter, zoom: 13),
         markers: _markers,
         myLocationButtonEnabled: false,
         zoomControlsEnabled: true,
@@ -228,17 +222,30 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
     final address = salon['address'] ?? '';
     final distanceKm = salon['distanceKm'];
     final salonId = salon['id'] ?? 0;
+    final isDemo = salon['isDemo'] == true;
 
     return GestureDetector(
       onTap: () {
+        if (isDemo) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Bu ornek salon. Gercek salon eklendiginde detay acilir.',
+              ),
+            ),
+          );
+          return;
+        }
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SalonDetailScreen(
-              salonId: salonId,
-              userId: widget.userId,
-              salonName: name,
-            ),
+            builder:
+                (_) => SalonDetailScreen(
+                  salonId: salonId,
+                  userId: widget.userId,
+                  salonName: name,
+                ),
           ),
         );
       },
@@ -250,7 +257,7 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 16,
               offset: const Offset(0, -4),
             ),
@@ -262,11 +269,14 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.12),
+                color: AppColors.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.content_cut,
-                  color: AppColors.accent, size: 24),
+              child: const Icon(
+                Icons.content_cut,
+                color: AppColors.accent,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -282,12 +292,16 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
                     ),
                   ),
                   if (address.isNotEmpty)
-                    Text(address,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.muted)),
+                    Text(
+                      address,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
                   if (distanceKm != null)
                     Text(
-                      '📍 ${(distanceKm as double).toStringAsFixed(1)} km',
+                      '${(distanceKm as num).toDouble().toStringAsFixed(1)} km',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.accent,
@@ -298,8 +312,7 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.accent,
                 borderRadius: BorderRadius.circular(8),
@@ -320,20 +333,32 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
   }
 
   Widget _buildSalonListTile(Map<String, dynamic> salon) {
+    final isDemo = salon['isDemo'] == true;
     return ListTile(
-      leading:
-          const Icon(Icons.content_cut, color: AppColors.accent),
+      leading: const Icon(Icons.content_cut, color: AppColors.accent),
       title: Text(salon['name'] ?? ''),
       subtitle: Text(salon['address'] ?? ''),
       onTap: () {
+        if (isDemo) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Bu ornek salon. Gercek salon eklendiginde detay acilir.',
+              ),
+            ),
+          );
+          return;
+        }
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SalonDetailScreen(
-              salonId: salon['id'] ?? 0,
-              userId: widget.userId,
-              salonName: salon['name'] ?? '',
-            ),
+            builder:
+                (_) => SalonDetailScreen(
+                  salonId: salon['id'] ?? 0,
+                  userId: widget.userId,
+                  salonName: salon['name'] ?? '',
+                ),
           ),
         );
       },

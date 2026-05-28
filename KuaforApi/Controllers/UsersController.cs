@@ -10,12 +10,9 @@ namespace KuaforApi.Controllers
     public class UsersController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _env;
-
-        public UsersController(AppDbContext context, IWebHostEnvironment env)
+        public UsersController(AppDbContext context)
         {
             _context = context;
-            _env = env;
         }
 
         [Authorize]
@@ -106,37 +103,38 @@ namespace KuaforApi.Controllers
             if (file.Length > 5 * 1024 * 1024)
                 return BadRequest(new { message = "Dosya 5MB'dan büyük olamaz." });
 
-            // _env.WebRootPath yerine sabit path — her zaman çalışır
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "profiles");
-            Directory.CreateDirectory(uploadsFolder);
+            await using var memory = new MemoryStream();
+            await file.CopyToAsync(memory);
 
-            // Eski fotoğrafı sil
-            if (!string.IsNullOrEmpty(user.ProfileImageUrl))
-            {
-                var oldFileName = Path.GetFileName(new Uri(user.ProfileImageUrl).LocalPath);
-                var oldPath = Path.Combine(uploadsFolder, oldFileName);
-                if (System.IO.File.Exists(oldPath))
-                    System.IO.File.Delete(oldPath);
-            }
-
-            var ext = Path.GetExtension(file.FileName).ToLower();
-            if (string.IsNullOrEmpty(ext)) ext = ".jpg";
-            var fileName = $"{user.Id}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-                await file.CopyToAsync(stream);
+            user.ProfileImageData = memory.ToArray();
+            user.ProfileImageContentType = file.ContentType.ToLower();
+            user.ProfileImageUpdatedAt = DateTime.UtcNow;
+            user.ProfileImageUrl = $"/api/Users/profile-photo/{user.Id}?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            _context.SaveChanges();
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var fullUrl = $"{baseUrl}/uploads/profiles/{fileName}";
-            user.ProfileImageUrl = fullUrl;
-            _context.SaveChanges();
+            var imageUrl = $"{baseUrl}{user.ProfileImageUrl}";
 
             return Ok(new
             {
                 message = "Fotoğraf yüklendi.",
-                profileImageUrl = fullUrl
+                profileImageUrl = imageUrl
             });
+        }
+
+        [HttpGet("profile-photo/{id:int}")]
+        public IActionResult GetProfilePhoto(int id)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.Id == id);
+            if (user?.ProfileImageData == null || user.ProfileImageData.Length == 0)
+                return NotFound();
+
+            return File(
+                user.ProfileImageData,
+                string.IsNullOrWhiteSpace(user.ProfileImageContentType)
+                    ? "image/jpeg"
+                    : user.ProfileImageContentType
+            );
         }
     }
 

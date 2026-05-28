@@ -16,10 +16,42 @@ class CampaignsScreen extends StatefulWidget {
 class _CampaignsScreenState extends State<CampaignsScreen> {
   final CampaignService _campaignService = CampaignService();
   final TextEditingController _codeController = TextEditingController();
+  static final List<Map<String, dynamic>> _demoCampaigns = [
+    {
+      'id': -201,
+      'title': 'Yeni uye bakim indirimi',
+      'description': 'Ilk randevuda sac kesimi ve bakim paketinde avantaj.',
+      'discountPercent': 20,
+      'code': 'STILIST20',
+      'endDate': DateTime.now().add(const Duration(days: 14)).toIso8601String(),
+      'isDemo': true,
+    },
+    {
+      'id': -202,
+      'title': 'Hafta ici manikur firsati',
+      'description': 'Pazartesi-persembe arasi tirnak hizmetlerinde gecerli.',
+      'discountPercent': 15,
+      'code': 'BAKIM15',
+      'endDate': DateTime.now().add(const Duration(days: 21)).toIso8601String(),
+      'isDemo': true,
+    },
+    {
+      'id': -203,
+      'title': 'Gelin saci on gorusme',
+      'description': 'Gelin saci planlamasinda ucretsiz on danisma.',
+      'discountPercent': 10,
+      'code': 'GELIN10',
+      'endDate': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+      'isDemo': true,
+    },
+  ];
   List<dynamic> _campaigns = [];
   bool _loading = true;
 
   bool get _isOwner => widget.salonId != null && widget.salonId! > 0;
+  bool get _showDemoCampaigns => !_isOwner && _campaigns.isEmpty;
+  List<dynamic> get _visibleCampaigns =>
+      _showDemoCampaigns ? _demoCampaigns : _campaigns;
 
   @override
   void dispose() {
@@ -48,56 +80,67 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddCampaignSheet(
-        salonId: widget.salonId!,
-        onSaved: () {
-          Navigator.pop(context);
-          _load();
-        },
-      ),
+      builder:
+          (_) => _AddCampaignSheet(
+            salonId: widget.salonId!,
+            onSaved: () {
+              Navigator.pop(context);
+              _load();
+            },
+          ),
     );
   }
 
   Future<void> _confirmDelete(int campaignId) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Kampanyayı Sil',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'Kampanyayı Sil',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            content: const Text(
+              'Bu kampanya kalıcı olarak silinecek. Emin misiniz?',
+              style: TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'İptal',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Sil',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        content: const Text(
-          'Bu kampanya kalıcı olarak silinecek. Emin misiniz?',
-          style: TextStyle(color: AppColors.muted, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal',
-                style: TextStyle(color: AppColors.muted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sil',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
     );
     if (confirmed == true) {
       final ok = await _campaignService.deleteCampaign(campaignId);
       if (!mounted) return;
       if (ok) {
         _load();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kampanya silindi.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Kampanya silindi.')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Silme işlemi başarısız.')),
@@ -113,10 +156,13 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(result.campaign != null
-            ? '${result.campaign!['title']} kodu geçerli: %${result.campaign!['discountPercent']} indirim'
-            : (result.error ?? 'Kod geçersiz')),
-        backgroundColor: result.campaign != null ? AppColors.primary : Colors.red.shade700,
+        content: Text(
+          result.campaign != null
+              ? '${result.campaign!['title']} kodu geçerli: %${result.campaign!['discountPercent']} indirim'
+              : (result.error ?? 'Kod geçersiz'),
+        ),
+        backgroundColor:
+            result.campaign != null ? AppColors.primary : Colors.red.shade700,
       ),
     );
   }
@@ -140,8 +186,11 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back_ios,
-                      color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.arrow_back_ios,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -176,13 +225,17 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.15),
+                        color: AppColors.accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: AppColors.accent.withOpacity(0.3)),
+                          color: AppColors.accent.withValues(alpha: 0.3),
+                        ),
                       ),
-                      child: const Icon(Icons.add_rounded,
-                          color: AppColors.accent, size: 22),
+                      child: const Icon(
+                        Icons.add_rounded,
+                        color: AppColors.accent,
+                        size: 22,
+                      ),
                     ),
                   ),
               ],
@@ -191,69 +244,120 @@ class _CampaignsScreenState extends State<CampaignsScreen> {
 
           // ── Liste ──
           Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent))
-                : _campaigns.isEmpty
+            child:
+                _loading
+                    ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    )
+                    : _isOwner && _campaigns.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.campaign_outlined,
-                                size: 56,
-                                color: AppColors.muted.withOpacity(0.4)),
-                            const SizedBox(height: 12),
-                            Text(
-                              _isOwner
-                                  ? 'Henüz kampanya eklenmedi'
-                                  : 'Aktif kampanya bulunmuyor',
-                              style: const TextStyle(
-                                  color: AppColors.muted, fontSize: 14),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.campaign_outlined,
+                            size: 56,
+                            color: AppColors.muted.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _isOwner
+                                ? 'Henüz kampanya eklenmedi'
+                                : 'Aktif kampanya bulunmuyor',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 14,
                             ),
-                            if (_isOwner) ...[
-                              const SizedBox(height: 20),
-                              GestureDetector(
-                                onTap: _showAddSheet,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accent,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'İlk kampanyayı ekle',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
+                          ),
+                          if (_isOwner) ...[
+                            const SizedBox(height: 20),
+                            GestureDetector(
+                              onTap: _showAddSheet,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'İlk kampanyayı ekle',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
-                            ],
+                            ),
                           ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _campaigns.length + (_isOwner ? 0 : 1),
-                        itemBuilder: (context, index) {
-                          if (!_isOwner && index == 0) {
-                            return _CampaignCodeCard(
-                              controller: _codeController,
-                              onApply: _validateCode,
-                            );
-                          }
-                          final campaignIndex = _isOwner ? index : index - 1;
-                          final c = _campaigns[campaignIndex];
-                          return _CampaignCard(
-                            campaign: c,
-                            isOwner: _isOwner,
-                            onDelete: () => _confirmDelete(c['id']),
-                          );
-                        },
+                        ],
                       ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount:
+                          _visibleCampaigns.length +
+                          (_isOwner ? 0 : 1) +
+                          (_showDemoCampaigns ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (!_isOwner && index == 0) {
+                          return _CampaignCodeCard(
+                            controller: _codeController,
+                            onApply: _validateCode,
+                          );
+                        }
+                        if (_showDemoCampaigns && index == 1) {
+                          return const _CampaignDemoNotice();
+                        }
+                        final campaignIndex =
+                            index -
+                            (_isOwner ? 0 : 1) -
+                            (_showDemoCampaigns ? 1 : 0);
+                        final c = _visibleCampaigns[campaignIndex];
+                        return _CampaignCard(
+                          campaign: c,
+                          isOwner: _isOwner,
+                          onDelete: () => _confirmDelete(c['id']),
+                        );
+                      },
+                    ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignDemoNotice extends StatelessWidget {
+  const _CampaignDemoNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.22)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 18),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Ornek kampanyalar gosteriliyor. Canli kampanya eklendiginde bu liste otomatik guncellenir.',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
           ),
         ],
       ),
@@ -298,7 +402,10 @@ class _CampaignCodeCard extends StatelessWidget {
               ),
               child: const Text(
                 'Uygula',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -322,6 +429,7 @@ class _CampaignCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDemo = campaign['isDemo'] == true;
     String? endDateStr;
     if (campaign['endDate'] != null) {
       try {
@@ -344,7 +452,7 @@ class _CampaignCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.12),
+              color: AppColors.accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -377,20 +485,27 @@ class _CampaignCard extends StatelessWidget {
                   Text(
                     campaign['description'],
                     style: const TextStyle(
-                        color: AppColors.muted, fontSize: 13),
+                      color: AppColors.muted,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
                 if (endDateStr != null) ...[
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.access_time,
-                          size: 12, color: AppColors.muted),
+                      const Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: AppColors.muted,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Bitiş: $endDateStr',
                         style: const TextStyle(
-                            color: AppColors.muted, fontSize: 11),
+                          color: AppColors.muted,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -398,9 +513,12 @@ class _CampaignCard extends StatelessWidget {
                 if ((campaign['code'] ?? '').toString().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.06),
+                      color: AppColors.primary.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -419,16 +537,19 @@ class _CampaignCard extends StatelessWidget {
           // Salon sahibi silme butonu
           if (isOwner)
             GestureDetector(
-              onTap: onDelete,
+              onTap: isDemo ? null : onDelete,
               child: Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: Colors.red, size: 18),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
+                  size: 18,
+                ),
               ),
             ),
         ],
@@ -475,12 +596,13 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
       initialDate: DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.accent),
-        ),
-        child: child!,
-      ),
+      builder:
+          (ctx, child) => Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: const ColorScheme.light(primary: AppColors.accent),
+            ),
+            child: child!,
+          ),
     );
     if (picked != null) setState(() => _endDate = picked);
   }
@@ -491,12 +613,13 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
       initialDate: _startDate,
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.accent),
-        ),
-        child: child!,
-      ),
+      builder:
+          (ctx, child) => Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: const ColorScheme.light(primary: AppColors.accent),
+            ),
+            child: child!,
+          ),
     );
     if (picked != null) setState(() => _startDate = picked);
   }
@@ -597,10 +720,7 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
 
             const FieldLabel(text: 'Kampanya Kodu'),
             const SizedBox(height: 6),
-            AppTextField(
-              controller: _codeController,
-              hint: 'ör. BAKIM20',
-            ),
+            AppTextField(controller: _codeController, hint: 'ör. BAKIM20'),
             const SizedBox(height: 14),
 
             const FieldLabel(text: 'İndirim Oranı (%)'),
@@ -619,15 +739,20 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 13),
+                  horizontal: 14,
+                  vertical: 13,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 16, color: AppColors.muted),
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 16,
+                      color: AppColors.muted,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       '${_startDate.day}.${_startDate.month}.${_startDate.year}',
@@ -649,24 +774,30 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 13),
+                  horizontal: 14,
+                  vertical: 13,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 16, color: AppColors.muted),
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 16,
+                      color: AppColors.muted,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       _endDate == null
                           ? 'Tarih seçin'
                           : '${_endDate!.day}.${_endDate!.month}.${_endDate!.year}',
                       style: TextStyle(
-                        color: _endDate == null
-                            ? AppColors.muted
-                            : AppColors.primary,
+                        color:
+                            _endDate == null
+                                ? AppColors.muted
+                                : AppColors.primary,
                         fontSize: 14,
                       ),
                     ),
@@ -674,8 +805,11 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
                       const Spacer(),
                       GestureDetector(
                         onTap: () => setState(() => _endDate = null),
-                        child: const Icon(Icons.close,
-                            size: 16, color: AppColors.muted),
+                        child: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: AppColors.muted,
+                        ),
                       ),
                     ],
                   ],
@@ -691,13 +825,16 @@ class _AddCampaignSheetState extends State<_AddCampaignSheet> {
 
             _saving
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.accent, strokeWidth: 2))
-                : PrimaryButton(
-                    label: 'Kampanyayı Kaydet',
-                    onTap: _save,
+                  child: CircularProgressIndicator(
                     color: AppColors.accent,
+                    strokeWidth: 2,
                   ),
+                )
+                : PrimaryButton(
+                  label: 'Kampanyayı Kaydet',
+                  onTap: _save,
+                  color: AppColors.accent,
+                ),
           ],
         ),
       ),

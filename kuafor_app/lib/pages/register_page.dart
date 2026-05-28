@@ -29,8 +29,8 @@ class _RegisterPageState
   AuthService();
 
   bool _isLoading = false;
-  bool _obscurePass = true;
-  bool _obscureConfirm = true;
+  final bool _obscurePass = true;
+  final bool _obscureConfirm = true;
 
   String? _message;
 

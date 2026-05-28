@@ -177,6 +177,9 @@ static void RepairRenderSchema(AppDbContext db)
             ADD COLUMN IF NOT EXISTS "ProviderId" text,
             ADD COLUMN IF NOT EXISTS "PasswordResetTokenHash" text,
             ADD COLUMN IF NOT EXISTS "PasswordResetTokenExpiresAt" timestamp with time zone NULL,
+            ADD COLUMN IF NOT EXISTS "ProfileImageData" bytea,
+            ADD COLUMN IF NOT EXISTS "ProfileImageContentType" text,
+            ADD COLUMN IF NOT EXISTS "ProfileImageUpdatedAt" timestamp with time zone NULL,
             ADD COLUMN IF NOT EXISTS "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW();
 
         ALTER TABLE IF EXISTS "Campaigns"
