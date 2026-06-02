@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../services/salon_service.dart';
+import '../services/post_service.dart';
 import '../services/review_service.dart';
+import '../services/salon_service.dart';
 import '../screens/booking_screen.dart';
+import '../screens/messages_screen.dart';
 import '../screens/posts_screen.dart';
 import '../widgets/app_widgets.dart';
 
 class SalonDetailScreen extends StatefulWidget {
   final int salonId;
   final int userId;
- final String salonName;
+  final String salonName;
 
   const SalonDetailScreen({
     super.key,
@@ -18,47 +20,30 @@ class SalonDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<SalonDetailScreen> createState() =>
-      _SalonDetailScreenState();
+  State<SalonDetailScreen> createState() => _SalonDetailScreenState();
 }
 
-class _SalonDetailScreenState
-    extends State<SalonDetailScreen>
+class _SalonDetailScreenState extends State<SalonDetailScreen>
     with SingleTickerProviderStateMixin {
-  final SalonService _salonService =
-      SalonService();
+  final SalonService _salonService = SalonService();
+  final ReviewService _reviewService = ReviewService();
+  final PostService _postService = PostService();
+  final TextEditingController _commentController = TextEditingController();
 
-  final ReviewService _reviewService =
-      ReviewService();
-
-  late TabController _tabController;
-
-  late Future<Map<String, dynamic>?>
-      _salonFuture;
-
-  late Future<List<dynamic>>
-      _reviewsFuture;
-
-  final TextEditingController
-      _commentController =
-      TextEditingController();
+  late final TabController _tabController;
+  late Future<Map<String, dynamic>?> _salonFuture;
+  late Future<List<dynamic>> _reviewsFuture;
+  late Future<List<Map<String, dynamic>>> _postsFuture;
 
   int _selectedRating = 5;
-
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-
-    _tabController = TabController(
-      length: 3,
-      vsync: this,
-    );
-
-    _salonFuture = _salonService
-        .getSalonDetail(widget.salonId);
-
+    _tabController = TabController(length: 3, vsync: this);
+    _salonFuture = _salonService.getSalonDetail(widget.salonId);
+    _postsFuture = _postService.getPostsBySalon(widget.salonId);
     _loadReviews();
   }
 
@@ -70,80 +55,46 @@ class _SalonDetailScreenState
   }
 
   void _loadReviews() {
-    setState(() {
-      _reviewsFuture =
-          _reviewService.getSalonReviews(
-        widget.salonId,
-      );
-    });
+    _reviewsFuture = _reviewService.getSalonReviews(widget.salonId);
   }
 
-  // ─────────────────────────────────────────
-  // YORUM GÖNDER
-  // ─────────────────────────────────────────
-
   Future<void> _submitReview() async {
-    // BOŞ YORUM KONTROLÜ
-    if (_commentController.text
-        .trim()
-        .isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content:
-              Text('Yorum boş olamaz'),
-        ),
-      );
-
+    if (_commentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Yorum boş olamaz')));
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    setState(() => _isSubmitting = true);
 
     try {
-      final success =
-          await _reviewService.addReview(
+      final success = await _reviewService.addReview(
         salonId: widget.salonId,
         userId: widget.userId,
         rating: _selectedRating,
-        comment: _commentController.text
-            .trim(),
+        comment: _commentController.text.trim(),
       );
 
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (!mounted) return;
 
-      // BAŞARILI
+      setState(() => _isSubmitting = false);
+
       if (success) {
         _commentController.clear();
-
         setState(() {
           _selectedRating = 5;
+          _loadReviews();
         });
 
-        _loadReviews();
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Yorumunuz başarıyla eklendi ✓',
-            ),
-            backgroundColor:
-                Color(0xFF0F172A),
+            content: Text('Yorumunuz başarıyla eklendi'),
+            backgroundColor: AppColors.primary,
           ),
         );
       } else {
-        // HİZMET ALMAMIŞ
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Yorum yapabilmek için bu salondan hizmet almanız gerekir.',
@@ -151,15 +102,11 @@ class _SalonDetailScreenState
           ),
         );
       }
-    } catch (e) {
-      setState(() {
-        _isSubmitting = false;
-      });
-
+    } catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Yorum yapabilmek için tamamlanmış randevunuz olmalıdır.',
@@ -169,750 +116,839 @@ class _SalonDetailScreenState
     }
   }
 
+  void _openInquiryMessage() {
+    if (widget.userId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mesaj göndermek için giriş yapın.')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => MessagesScreen(
+              userId: widget.userId,
+              initialSalonId: widget.salonId,
+              initialSalonName: widget.salonName,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
+      body: FutureBuilder<Map<String, dynamic>?>(
+        future: _salonFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            );
+          }
 
-      body: Column(
-        children: [
-          // ───────────────── HEADER ─────────────────
+          final salon = snapshot.data;
+          final services = (salon?['services'] as List<dynamic>?) ?? [];
 
-          Container(
-            color: AppColors.primary,
-
-            padding: EdgeInsets.only(
-              top:
-                  MediaQuery.of(context)
-                          .padding
-                          .top +
-                      16,
-              left: 24,
-              right: 24,
-            ),
-
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-
-              children: [
-                Row(
+          return Column(
+            children: [
+              _ProfileHeader(
+                salon: salon,
+                fallbackName: widget.salonName,
+                servicesCount: services.length,
+                reviewsFuture: _reviewsFuture,
+                postsFuture: _postsFuture,
+                tabController: _tabController,
+                onMessageTap: _openInquiryMessage,
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
                   children: [
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pop(
-                              context),
-
-                      child: const Icon(
-                        Icons.arrow_back_ios,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                    _buildServicesTab(services),
+                    PostsScreen(
+                      salonId: widget.salonId,
+                      isOwner: false,
+                      embedded: true,
                     ),
-
-                    const SizedBox(width: 16),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-
-                        children: [
-                          const Text(
-                            'SALON',
-
-                            style: TextStyle(
-                              color:
-                                  AppColors
-                                      .accent,
-                              fontSize: 11,
-                              fontWeight:
-                                  FontWeight
-                                      .w600,
-                              letterSpacing:
-                                  2.5,
-                            ),
-                          ),
-
-                          const SizedBox(
-                              height: 2),
-
-                          Text(
-                            widget.salonName,
-
-                            style:
-                                const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight:
-                                  FontWeight
-                                      .w500,
-                            ),
-
-                            overflow:
-                                TextOverflow
-                                    .ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildReviewsTab(),
                   ],
                 ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-                const SizedBox(height: 16),
+  Widget _buildServicesTab(List<dynamic> services) {
+    if (services.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.content_cut_rounded,
+        title: 'Henüz hizmet eklenmemiş',
+        message: 'Salon hizmet eklediğinde burada görünecek.',
+      );
+    }
 
-                // ───────── TABBAR ─────────
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      itemCount: services.length,
+      itemBuilder:
+          (context, index) => _ServiceCard(
+            service: services[index],
+            onBook: () {
+              final service = services[index];
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (_) => BookingScreen(
+                        customerId: widget.userId,
+                        salonId: widget.salonId,
+                        salonName: widget.salonName,
+                        serviceId: service['id'],
+                        serviceName: service['name'],
+                        servicePrice:
+                            ((service['price'] ?? 0) as num).toDouble(),
+                        serviceDurationMinutes: service['durationMinutes'],
+                      ),
+                ),
+              );
+            },
+          ),
+    );
+  }
 
-                TabBar(
-                  controller: _tabController,
+  Widget _buildReviewsTab() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      children: [
+        _ReviewComposer(
+          selectedRating: _selectedRating,
+          isSubmitting: _isSubmitting,
+          controller: _commentController,
+          onRatingChanged: (rating) => setState(() => _selectedRating = rating),
+          onSubmit: _submitReview,
+        ),
+        const SizedBox(height: 18),
+        FutureBuilder<List<dynamic>>(
+          future: _reviewsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                ),
+              );
+            }
 
-                  indicatorColor:
-                      AppColors.accent,
+            final reviews = snapshot.data ?? [];
+            if (reviews.isEmpty) {
+              return const _EmptyState(
+                icon: Icons.rate_review_outlined,
+                title: 'Henüz yorum yok',
+                message: 'İlk deneyim paylaşıldığında burada görünecek.',
+                compact: true,
+              );
+            }
 
-                  indicatorWeight: 3,
+            return Column(
+              children:
+                  reviews.map((review) => _ReviewCard(review: review)).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
 
-                  labelColor:
-                      Colors.white,
+class _ProfileHeader extends StatelessWidget {
+  final Map<String, dynamic>? salon;
+  final String fallbackName;
+  final int servicesCount;
+  final Future<List<dynamic>> reviewsFuture;
+  final Future<List<Map<String, dynamic>>> postsFuture;
+  final TabController tabController;
+  final VoidCallback onMessageTap;
 
-                  unselectedLabelColor:
-                      Colors.white54,
+  const _ProfileHeader({
+    required this.salon,
+    required this.fallbackName,
+    required this.servicesCount,
+    required this.reviewsFuture,
+    required this.postsFuture,
+    required this.tabController,
+    required this.onMessageTap,
+  });
 
-                  tabs: const [
-                    Tab(
-                        text:
-                            'Hizmetler'),
-                    Tab(
-                        text:
-                            'Gönderiler'),
-                    Tab(
-                        text:
-                            'Yorumlar'),
-                  ],
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final name = (salon?['name'] ?? fallbackName).toString();
+    final address = (salon?['address'] ?? '').toString();
+    final description = (salon?['description'] ?? '').toString();
+    final imageUrl = (salon?['imageUrl'] ?? '').toString();
+
+    return Container(
+      width: double.infinity,
+      color: AppColors.primary,
+      padding: EdgeInsets.only(top: topPadding + 12),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+                  color: Colors.white,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 38,
+                    height: 38,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
           ),
-
-          // ───────────────── İÇERİK ─────────────────
-
-          Expanded(
-            child:
-                FutureBuilder<
-                    Map<String,
-                        dynamic>?>(
-              future: _salonFuture,
-
-              builder:
-                  (context, snapshot) {
-                if (snapshot
-                        .connectionState ==
-                    ConnectionState
-                        .waiting) {
-                  return const Center(
-                    child:
-                        CircularProgressIndicator(),
-                  );
-                }
-
-                final salon =
-                    snapshot.data;
-
-                final services =
-                    (salon?['services']
-                            as List<dynamic>?) ??
-                        [];
-
-                return TabBarView(
-                  controller:
-                      _tabController,
-
-                  children: [
-
-                    // ───────── HİZMETLER ─────────
-
-                    ListView(
-                      padding:
-                          const EdgeInsets
-                              .all(16),
-
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _SalonAvatar(name: name, imageUrl: imageUrl),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _StatBlock(label: 'Hizmet', value: '$servicesCount'),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: postsFuture,
+                        builder:
+                            (context, snapshot) => _StatBlock(
+                              label: 'Gönderi',
+                              value: '${snapshot.data?.length ?? 0}',
+                            ),
+                      ),
+                      FutureBuilder<List<dynamic>>(
+                        future: reviewsFuture,
+                        builder: (context, snapshot) {
+                          final reviews = snapshot.data ?? [];
+                          final average = _averageRating(reviews);
+                          return _StatBlock(
+                            label: 'Puan',
+                            value:
+                                average == 0 ? '-' : average.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (address.isNotEmpty || description.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (address.isNotEmpty)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (services
-                            .isEmpty)
-                          Container(
-                            padding:
-                                const EdgeInsets
-                                    .all(20),
-
-                            decoration:
-                                BoxDecoration(
-                              color: Colors
-                                  .white,
-
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                          14),
+                        const Icon(
+                          Icons.place_outlined,
+                          color: AppColors.accent,
+                          size: 17,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            address,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontSize: 12,
+                              height: 1.35,
                             ),
-
-                            child:
-                                const Center(
-                              child: Text(
-                                'Henüz hizmet eklenmemiş',
-                              ),
-                            ),
-                          )
-                        else
-                          ...services
-                              .map(
-                                (service) =>
-                                    Container(
-                                  margin:
-                                      const EdgeInsets
-                                          .only(
-                                              bottom:
-                                                  8),
-
-                                  padding:
-                                      const EdgeInsets
-                                          .all(
-                                              16),
-
-                                  decoration:
-                                      BoxDecoration(
-                                    color: Colors
-                                        .white,
-
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                            14),
-                                  ),
-
-                                  child:
-                                      Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment
-                                            .start,
-
-                                    children: [
-                                      Text(
-                                        service[
-                                                'name'] ??
-                                            '',
-
-                                        style:
-                                            const TextStyle(
-                                          fontSize:
-                                              16,
-                                          fontWeight:
-                                              FontWeight.w600,
-                                        ),
-                                      ),
-
-                                      const SizedBox(
-                                          height:
-                                              8),
-
-                                      Text(
-                                        '₺${service['price']}',
-                                      ),
-
-                                      const SizedBox(
-                                          height:
-                                              12),
-
-                                      GestureDetector(
-                                        onTap:
-                                            () {
-                                          Navigator
-                                              .push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) =>
-                                                      BookingScreen(
-                                                customerId:
-                                                    widget.userId,
-
-                                                salonId:
-                                                    widget.salonId,
-
-                                                salonName:
-                                                    widget.salonName,
-
-                                                serviceId:
-                                                    service['id'],
-
-                                                serviceName:
-                                                    service['name'],
-
-                                                servicePrice:
-                                                    (service['price'] as num)
-                                                        .toDouble(),
-
-                                                serviceDurationMinutes:
-                                                    service['durationMinutes'],
-                                              ),
-                                            ),
-                                          );
-                                        },
-
-                                        child:
-                                            Container(
-                                          width:
-                                              double.infinity,
-
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                            vertical:
-                                                12,
-                                          ),
-
-                                          decoration:
-                                              BoxDecoration(
-                                            color:
-                                                AppColors.primary,
-
-                                            borderRadius:
-                                                BorderRadius.circular(
-                                                    12),
-                                          ),
-
-                                          child:
-                                              const Center(
-                                            child:
-                                                Text(
-                                              'Randevu Al',
-
-                                              style:
-                                                  TextStyle(
-                                                color:
-                                                    Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                          ),
+                        ),
                       ],
                     ),
-
-                    // ───────── GÖNDERİLER ─────────
-
-                    Container(
-                      color: Colors.white,
-
-                      child: PostsScreen(
-                        salonId:
-                            widget.salonId,
-                        isOwner: false,
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        fontSize: 12,
+                        height: 1.35,
                       ),
                     ),
-
-                    // ───────── YORUMLAR ─────────
-
-                    ListView(
-                      padding:
-                          const EdgeInsets
-                              .all(16),
-
-                      children: [
-
-                        const Text(
-                          'YORUM YAZ',
-
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
-                          ),
-                        ),
-
-                        const SizedBox(
-                            height: 10),
-
-                        // BİLGİ MESAJI
-
-                        Container(
-                          padding:
-                              const EdgeInsets
-                                  .all(12),
-
-                          decoration:
-                              BoxDecoration(
-                            color: Colors
-                                .orange
-                                .shade50,
-
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                                        12),
-                          ),
-
-                          child:
-                              const Row(
-                            children: [
-                              Icon(
-                                Icons
-                                    .info_outline,
-                                color: Colors
-                                    .orange,
-                              ),
-
-                              SizedBox(
-                                  width: 8),
-
-                              Expanded(
-                                child: Text(
-                                  'Yalnızca hizmet alan müşteriler yorum yapabilir.',
-                                  style:
-                                      TextStyle(
-                                    fontSize:
-                                        12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(
-                            height: 12),
-
-                        // YORUM KUTUSU
-
-                        Container(
-                          padding:
-                              const EdgeInsets
-                                  .all(16),
-
-                          decoration:
-                              BoxDecoration(
-                            color:
-                                Colors.white,
-
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                                        14),
-                          ),
-
-                          child:
-                              Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
-
-                            children: [
-
-                              // YILDIZLAR
-
-                              Row(
-                                children:
-                                    List.generate(
-                                  5,
-                                  (i) {
-                                    final star =
-                                        i + 1;
-
-                                    return GestureDetector(
-                                      onTap:
-                                          () {
-                                        setState(
-                                            () {
-                                          _selectedRating =
-                                              star;
-                                        });
-                                      },
-
-                                      child:
-                                          Icon(
-                                        star <=
-                                                _selectedRating
-                                            ? Icons.star_rounded
-                                            : Icons.star_outline_rounded,
-
-                                        color: star <=
-                                                _selectedRating
-                                            ? Colors.amber
-                                            : Colors.grey,
-
-                                        size:
-                                            28,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-
-                              const SizedBox(
-                                  height:
-                                      10),
-
-                              // TEXTFIELD
-
-                              TextField(
-                                controller:
-                                    _commentController,
-
-                                maxLines:
-                                    3,
-
-                                decoration:
-                                    InputDecoration(
-                                  hintText:
-                                      'Deneyiminizi paylaşın...',
-
-                                  filled:
-                                      true,
-
-                                  fillColor:
-                                      Colors.grey
-                                          .shade100,
-
-                                  border:
-                                      OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                            12),
-
-                                    borderSide:
-                                        BorderSide.none,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(
-                                  height:
-                                      12),
-
-                              // GÖNDER BUTONU
-
-                              GestureDetector(
-                                onTap:
-                                    _isSubmitting
-                                        ? null
-                                        : _submitReview,
-
-                                child:
-                                    Container(
-                                  width:
-                                      double.infinity,
-
-                                  padding:
-                                      const EdgeInsets.symmetric(
-                                    vertical:
-                                        14,
-                                  ),
-
-                                  decoration:
-                                      BoxDecoration(
-                                    color:
-                                        AppColors.primary,
-
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                            12),
-                                  ),
-
-                                  child:
-                                      Center(
-                                    child: _isSubmitting
-                                        ? const SizedBox(
-                                            width:
-                                                18,
-                                            height:
-                                                18,
-
-                                            child:
-                                                CircularProgressIndicator(
-                                              color:
-                                                  Colors.white,
-                                              strokeWidth:
-                                                  2,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Gönder',
-
-                                            style:
-                                                TextStyle(
-                                              color:
-                                                  Colors.white,
-
-                                              fontWeight:
-                                                  FontWeight.w600,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(
-                            height: 20),
-
-                        // MÜŞTERİ YORUMLARI
-
-                        FutureBuilder<
-                            List<dynamic>>(
-                          future:
-                              _reviewsFuture,
-
-                          builder:
-                              (context,
-                                  snap) {
-
-                            if (snap.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child:
-                                    CircularProgressIndicator(),
-                              );
-                            }
-
-                            if (!snap.hasData ||
-                                snap.data!
-                                    .isEmpty) {
-                              return Container(
-                                padding:
-                                    const EdgeInsets.all(
-                                        20),
-
-                                decoration:
-                                    BoxDecoration(
-                                  color: Colors
-                                      .white,
-
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                          14),
-                                ),
-
-                                child:
-                                    const Center(
-                                  child: Text(
-                                    'Henüz yorum yok',
-                                  ),
-                                ),
-                              );
-                            }
-
-                            return Column(
-                              children:
-                                  snap.data!
-                                      .map(
-                                (review) {
-
-                                  final rating =
-                                      review[
-                                              'rating'] ??
-                                          0;
-
-                                  final name =
-                                      review['user']
-                                              ?[
-                                              'fullName'] ??
-                                          'Kullanıcı';
-
-                                  return Container(
-                                    margin:
-                                        const EdgeInsets.only(
-                                            bottom:
-                                                8),
-
-                                    padding:
-                                        const EdgeInsets.all(
-                                            14),
-
-                                    decoration:
-                                        BoxDecoration(
-                                      color:
-                                          Colors.white,
-
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                              14),
-                                    ),
-
-                                    child:
-                                        Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-
-                                      children: [
-
-                                        Row(
-                                          children: [
-
-                                            Expanded(
-                                              child:
-                                                  Text(
-                                                name,
-
-                                                style:
-                                                    const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-
-                                            Row(
-                                              children:
-                                                  List.generate(
-                                                5,
-                                                (i) =>
-                                                    Icon(
-                                                  i < rating
-                                                      ? Icons.star_rounded
-                                                      : Icons.star_outline_rounded,
-
-                                                  color:
-                                                      Colors.amber,
-
-                                                  size:
-                                                      16,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(
-                                            height:
-                                                8),
-
-                                        Text(
-                                          review[
-                                                  'comment'] ??
-                                              '',
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ).toList(),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
                   ],
-                );
-              },
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onMessageTap,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.28),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 17,
+                    ),
+                    label: const Text(
+                      'Mesaj',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          TabBar(
+            controller: tabController,
+            indicatorColor: AppColors.accent,
+            indicatorWeight: 3,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white54,
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            tabs: const [
+              Tab(text: 'Hizmetler'),
+              Tab(text: 'Gönderiler'),
+              Tab(text: 'Yorumlar'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static double _averageRating(List<dynamic> reviews) {
+    if (reviews.isEmpty) return 0;
+    final total = reviews.fold<double>(
+      0,
+      (sum, review) => sum + ((review['rating'] ?? 0) as num).toDouble(),
+    );
+    return total / reviews.length;
+  }
+}
+
+class _SalonAvatar extends StatelessWidget {
+  final String name;
+  final String imageUrl;
+
+  const _SalonAvatar({required this.name, required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Container(
+      color: AppColors.accent.withValues(alpha: 0.18),
+      child: Center(
+        child: Text(
+          name.trim().isEmpty ? 'S' : name.trim()[0].toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.accent,
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+
+    return Container(
+      width: 82,
+      height: 82,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.accent, width: 2),
+      ),
+      child: ClipOval(
+        child:
+            imageUrl.isEmpty
+                ? fallback
+                : Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => fallback,
+                ),
+      ),
+    );
+  }
+}
+
+class _StatBlock extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _StatBlock({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 64,
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.58),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _ServiceCard extends StatelessWidget {
+  final dynamic service;
+  final VoidCallback onBook;
+
+  const _ServiceCard({required this.service, required this.onBook});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (service['name'] ?? 'Hizmet').toString();
+    final price = ((service['price'] ?? 0) as num).toDouble();
+    final duration = service['durationMinutes'];
+    final stylistName = (service['stylistName'] ?? '').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.content_cut_rounded,
+                  color: AppColors.accent,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (stylistName.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        stylistName,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Text(
+                _formatPrice(price),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              if (duration != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.schedule_rounded,
+                        color: AppColors.muted,
+                        size: 15,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '$duration dk',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const Spacer(),
+              ElevatedButton(
+                onPressed: onBook,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Randevu Al',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewComposer extends StatelessWidget {
+  final int selectedRating;
+  final bool isSubmitting;
+  final TextEditingController controller;
+  final ValueChanged<int> onRatingChanged;
+  final VoidCallback onSubmit;
+
+  const _ReviewComposer({
+    required this.selectedRating,
+    required this.isSubmitting,
+    required this.controller,
+    required this.onRatingChanged,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Yorum yaz',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: AppColors.accent),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Yalnızca hizmet alan müşteriler yorum yapabilir.',
+                    style: TextStyle(fontSize: 12, color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(5, (index) {
+              final star = index + 1;
+              return GestureDetector(
+                onTap: () => onRatingChanged(star),
+                child: Icon(
+                  star <= selectedRating
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                  color: Colors.amber,
+                  size: 30,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Deneyiminizi paylaşın...',
+              filled: true,
+              fillColor: AppColors.surfaceSoft,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isSubmitting ? null : onSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.55,
+                ),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child:
+                  isSubmitting
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : const Text(
+                        'Gönder',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final dynamic review;
+
+  const _ReviewCard({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = ((review['rating'] ?? 0) as num).toInt();
+    final name = (review['user']?['fullName'] ?? 'Kullanıcı').toString();
+    final comment = (review['comment'] ?? '').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+                child: Text(
+                  name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Row(
+                children: List.generate(
+                  5,
+                  (index) => Icon(
+                    index < rating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: Colors.amber,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              comment,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool compact;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 18 : 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.muted, size: compact ? 40 : 54),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                height: 1.35,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatPrice(double price) {
+  if (price % 1 == 0) return '₺${price.toInt()}';
+  return '₺${price.toStringAsFixed(2)}';
 }

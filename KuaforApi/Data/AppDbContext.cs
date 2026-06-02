@@ -21,6 +21,8 @@ namespace KuaforApi.Data
         public DbSet<Post> Posts { get; set; } = null!;
         public DbSet<PostImage> PostImages { get; set; } = null!;
         public DbSet<StylistAvailability> StylistAvailabilities { get; set; } = null!;
+        public DbSet<MessageThread> MessageThreads { get; set; } = null!;
+        public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -74,6 +76,34 @@ namespace KuaforApi.Data
                 .WithMany()
                 .HasForeignKey(a => a.StylistId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MessageThread>()
+                .HasIndex(t => new { t.SalonId, t.CustomerId, t.Type })
+                .IsUnique();
+
+            modelBuilder.Entity<MessageThread>()
+                .HasOne(t => t.Salon)
+                .WithMany()
+                .HasForeignKey(t => t.SalonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MessageThread>()
+                .HasOne(t => t.Customer)
+                .WithMany()
+                .HasForeignKey(t => t.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.MessageThread)
+                .WithMany(t => t.Messages)
+                .HasForeignKey(m => m.MessageThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

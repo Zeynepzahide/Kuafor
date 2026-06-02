@@ -8,6 +8,7 @@ import '../services/appointment_service.dart';
 import '../services/auth_service.dart';
 import '../services/campaign_service.dart';
 import '../services/review_service.dart';
+import '../services/salon_service.dart';
 import '../widgets/app_widgets.dart';
 import 'login_page.dart';
 
@@ -28,6 +29,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final AppointmentService _appointmentService = AppointmentService();
   final ReviewService _reviewService = ReviewService();
   final CampaignService _campaignService = CampaignService();
+  final SalonService _salonService = SalonService();
   final ImagePicker _picker = ImagePicker();
 
   String name = "";
@@ -112,21 +114,43 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadStats() async {
     if (_userId == 0) return;
 
-    final appointments =
-        await _appointmentService.getCustomerAppointments(_userId);
-    final reviews = await _reviewService.getReviews();
     final campaigns = await _campaignService.getCampaigns();
 
+    if (role == 'SalonOwner') {
+      final salon = await _salonService.getSalonByOwner(_userId);
+      final salonId = salon?['id'] as int? ?? 0;
+      final appointments =
+          salonId == 0
+              ? <dynamic>[]
+              : await _appointmentService.getSalonAppointments(salonId);
+      final summary =
+          salonId == 0
+              ? <String, dynamic>{'averageRating': 0, 'count': 0}
+              : await _reviewService.getSalonReviewSummary(salonId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _appointmentCount = appointments.length;
+        _reviewCount = (summary['count'] ?? 0) as int;
+        _campaignCount = campaigns.length;
+        _averageRating = ((summary['averageRating'] ?? 0) as num).toDouble();
+      });
+      return;
+    }
+
+    final appointments = await _appointmentService.getCustomerAppointments(
+      _userId,
+    );
+    final reviews = await _reviewService.getReviews();
     final myReviews = reviews.where((r) => r['userId'] == _userId).toList();
 
     double avg = 0;
-
     if (myReviews.isNotEmpty) {
       final total = myReviews.fold<double>(
         0,
         (sum, r) => sum + ((r['rating'] ?? 0) as num).toDouble(),
       );
-
       avg = total / myReviews.length;
     }
 
@@ -147,9 +171,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('E-posta kopyalandı')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('E-posta kopyalandı')));
   }
 
   Future<void> _openMail() async {
@@ -180,9 +204,9 @@ class _ProfilePageState extends State<ProfilePage> {
     } else {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WhatsApp açılamadı')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('WhatsApp açılamadı')));
     }
   }
 
@@ -254,48 +278,50 @@ class _ProfilePageState extends State<ProfilePage> {
   void _showFaqDialog() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Sık Sorulan Sorular'),
-        content: const Text(
-          '• Randevu nasıl alınır?\n'
-          'Salon seçip hizmet, tarih ve saat belirleyerek randevu alabilirsiniz.\n\n'
-          '• Kampanya kodu nasıl kullanılır?\n'
-          'Randevu özet ekranında kampanya kodunu girip Uygula butonuna basabilirsiniz.\n\n'
-          '• Randevumu nereden görürüm?\n'
-          'Müşteri panelindeki randevular bölümünden takip edebilirsiniz.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Sık Sorulan Sorular'),
+            content: const Text(
+              '• Randevu nasıl alınır?\n'
+              'Salon seçip hizmet, tarih ve saat belirleyerek randevu alabilirsiniz.\n\n'
+              '• Kampanya kodu nasıl kullanılır?\n'
+              'Randevu özet ekranında kampanya kodunu girip Uygula butonuna basabilirsiniz.\n\n'
+              '• Randevumu nereden görürüm?\n'
+              'Müşteri panelindeki randevular bölümünden takip edebilirsiniz.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   void _showRateDialog() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Uygulamayı Değerlendir'),
-        content: const Text(
-          'Kuaför uygulamasını beğendiyseniz mağaza yayını açıldığında buradan puan verebilirsiniz. Şimdilik geri bildiriminizi destek ekibine iletebilirsiniz.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Daha Sonra'),
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Uygulamayı Değerlendir'),
+            content: const Text(
+              'Kuaför uygulamasını beğendiyseniz mağaza yayını açıldığında buradan puan verebilirsiniz. Şimdilik geri bildiriminizi destek ekibine iletebilirsiniz.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Daha Sonra'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _openMail();
+                },
+                child: const Text('Geri Bildirim Gönder'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _openMail();
-            },
-            child: const Text('Geri Bildirim Gönder'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -337,94 +363,95 @@ class _ProfilePageState extends State<ProfilePage> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(99),
+      builder:
+          (_) => Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Fotoğraf Seç',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.photo_library_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text(
+                      'Galeriden Seç',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text(
+                      'Kameradan Çek',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Fotoğraf Seç',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.photo_library_outlined,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-                title: const Text(
-                  'Galeriden Seç',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt_outlined,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-                title: const Text(
-                  'Kameradan Çek',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
 
     if (source == null) return;
@@ -466,9 +493,9 @@ class _ProfilePageState extends State<ProfilePage> {
     } else {
       setState(() => _uploadingPhoto = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fotoğraf yüklenemedi')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Fotoğraf yüklenemedi')));
     }
   }
 
@@ -525,9 +552,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (token == null || token.isEmpty) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Oturum bulunamadı.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Oturum bulunamadı.")));
 
       return;
     }
@@ -542,13 +569,13 @@ class _ProfilePageState extends State<ProfilePage> {
     if (success) {
       setState(() => name = result.trim());
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Ad soyad güncellendi")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Ad soyad güncellendi")));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Güncelleme başarısız")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Güncelleme başarısız")));
     }
   }
 
@@ -654,9 +681,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (token == null || token.isEmpty) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Oturum bulunamadı.")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Oturum bulunamadı.")));
 
       return;
     }
@@ -731,312 +758,311 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.mainDark,
-                strokeWidth: 2,
-              ),
-            )
-          : _errorMessage != null
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.mainDark,
+                  strokeWidth: 2,
+                ),
+              )
+              : _errorMessage != null
               ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: ErrorBanner(message: _errorMessage!),
-                  ),
-                )
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ErrorBanner(message: _errorMessage!),
+                ),
+              )
               : CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: SafeArea(
-                        bottom: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                          child: Row(
-                            children: [
-                              _IconBtn(
-                                icon: Icons.arrow_back_ios_new_rounded,
-                                onTap: () => Navigator.pop(context),
-                              ),
-                              const Expanded(
-                                child: Text(
-                                  'Profil',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                  ),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                        child: Row(
+                          children: [
+                            _IconBtn(
+                              icon: Icons.arrow_back_ios_new_rounded,
+                              onTap: () => Navigator.pop(context),
+                            ),
+                            const Expanded(
+                              child: Text(
+                                'Profil',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                              _IconBtn(
-                                icon: Icons.edit_outlined,
-                                onTap: _editName,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Container(
-                        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.mainDark,
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.10),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
-                              child: Stack(
-                                children: [
-                                  _uploadingPhoto
-                                      ? Container(
-                                          width: 66,
-                                          height: 66,
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.08),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white
-                                                  .withOpacity(0.08),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: const Center(
-                                            child: SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      : Container(
-                                          width: 66,
-                                          height: 66,
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.08),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white
-                                                  .withOpacity(0.08),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: _profileAvatar(),
-                                        ),
-                                  if (!_uploadingPhoto)
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        width: 22,
-                                        height: 22,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.accent,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: AppColors.mainDark,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.camera_alt,
-                                          size: 12,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name.isNotEmpty ? name : 'Kullanıcı',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  GestureDetector(
-                                    onTap: _copyEmail,
-                                    child: Text(
-                                      email.isNotEmpty ? email : '-',
-                                      style: TextStyle(
-                                        color:
-                                            Colors.white.withOpacity(0.62),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          AppColors.accent.withOpacity(0.10),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color:
-                                            AppColors.accent.withOpacity(0.28),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      _roleLabel,
-                                      style: const TextStyle(
-                                        color: AppColors.accent,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                        child: Row(
-                          children: [
-                            _StatCard(
-                              label: 'Randevu',
-                              value: '$_appointmentCount',
-                            ),
-                            const SizedBox(width: 8),
-                            _StatCard(
-                              label: 'Puan',
-                              value: _averageRating.toStringAsFixed(1),
-                            ),
-                            const SizedBox(width: 8),
-                            _StatCard(
-                              label: 'Kampanya',
-                              value: '$_campaignCount',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: _Section(
-                        title: 'Hesap',
-                        child: Column(
-                          children: [
-                            _InfoRow(
-                              icon: Icons.person_outline_rounded,
-                              label: 'Ad Soyad',
-                              value: name.isNotEmpty ? name : '-',
+                            _IconBtn(
+                              icon: Icons.edit_outlined,
                               onTap: _editName,
                             ),
-                            _InfoRow(
-                              icon: Icons.mail_outline_rounded,
-                              label: 'E-posta',
-                              value: email.isNotEmpty ? email : '-',
-                              onTap: _copyEmail,
-                            ),
-                            _InfoRow(
-                              icon: Icons.lock_outline_rounded,
-                              label: 'Şifre',
-                              value: '••••••••',
-                              onTap: _editPassword,
-                              isLast: true,
-                            ),
                           ],
                         ),
                       ),
                     ),
-                    SliverToBoxAdapter(
-                      child: _Section(
-                        title: 'Tercihler',
-                        child: Column(
-                          children: [
-                            _ToggleRow(
-                              icon: Icons.notifications_outlined,
-                              label: 'Bildirimler',
-                              subtitle: 'Randevu hatırlatmaları',
-                              value: _notifOn,
-                              onChanged: _setNotificationsEnabled,
+                  ),
+                  SliverToBoxAdapter(
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainDark,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.10),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                            child: Stack(
+                              children: [
+                                _uploadingPhoto
+                                    ? Container(
+                                      width: 66,
+                                      height: 66,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.08),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.08),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    : Container(
+                                      width: 66,
+                                      height: 66,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.08),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.08),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: _profileAvatar(),
+                                    ),
+                                if (!_uploadingPhoto)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: AppColors.mainDark,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                            _ToggleRow(
-                              icon: Icons.campaign_outlined,
-                              label: 'Kampanya Bildirimleri',
-                              subtitle: 'Fırsat ve indirimler',
-                              value: _campaignNotif,
-                              onChanged: _setCampaignNotificationsEnabled,
-                              isLast: true,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name.isNotEmpty ? name : 'Kullanıcı',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                GestureDetector(
+                                  onTap: _copyEmail,
+                                  child: Text(
+                                    email.isNotEmpty ? email : '-',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.62),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent.withOpacity(0.10),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: AppColors.accent.withOpacity(0.28),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _roleLabel,
+                                    style: const TextStyle(
+                                      color: AppColors.accent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    SliverToBoxAdapter(
-                      child: _Section(
-                        title: 'Diğer',
-                        child: Column(
-                          children: [
-                            _InfoRow(
-                              icon: Icons.help_outline_rounded,
-                              label: 'Yardım & Destek',
-                              onTap: _showSupport,
-                            ),
-                            _InfoRow(
-                              icon: Icons.star_outline_rounded,
-                              label: 'Uygulamayı Değerlendir',
-                              onTap: _showRateDialog,
-                            ),
-                            _InfoRow(
-                              icon: Icons.info_outline_rounded,
-                              label: 'Versiyon',
-                              value: '1.0.0',
-                              showArrow: false,
-                              isLast: true,
-                            ),
-                          ],
-                        ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      child: Row(
+                        children: [
+                          _StatCard(
+                            label: 'Randevu',
+                            value: '$_appointmentCount',
+                          ),
+                          const SizedBox(width: 8),
+                          _StatCard(
+                            label: role == 'SalonOwner' ? 'Puan' : 'Yorum',
+                            value:
+                                role == 'SalonOwner'
+                                    ? _averageRating.toStringAsFixed(1)
+                                    : '$_reviewCount',
+                          ),
+                          const SizedBox(width: 8),
+                          _StatCard(
+                            label: 'Kampanya',
+                            value: '$_campaignCount',
+                          ),
+                        ],
                       ),
                     ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                        child: _isLoggingOut
-                            ? const Center(
+                  ),
+                  SliverToBoxAdapter(
+                    child: _Section(
+                      title: 'Hesap',
+                      child: Column(
+                        children: [
+                          _InfoRow(
+                            icon: Icons.person_outline_rounded,
+                            label: 'Ad Soyad',
+                            value: name.isNotEmpty ? name : '-',
+                            onTap: _editName,
+                          ),
+                          _InfoRow(
+                            icon: Icons.mail_outline_rounded,
+                            label: 'E-posta',
+                            value: email.isNotEmpty ? email : '-',
+                            onTap: _copyEmail,
+                          ),
+                          _InfoRow(
+                            icon: Icons.lock_outline_rounded,
+                            label: 'Şifre',
+                            value: '••••••••',
+                            onTap: _editPassword,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _Section(
+                      title: 'Tercihler',
+                      child: Column(
+                        children: [
+                          _ToggleRow(
+                            icon: Icons.notifications_outlined,
+                            label: 'Bildirimler',
+                            subtitle: 'Randevu hatırlatmaları',
+                            value: _notifOn,
+                            onChanged: _setNotificationsEnabled,
+                          ),
+                          _ToggleRow(
+                            icon: Icons.campaign_outlined,
+                            label: 'Kampanya Bildirimleri',
+                            subtitle: 'Fırsat ve indirimler',
+                            value: _campaignNotif,
+                            onChanged: _setCampaignNotificationsEnabled,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _Section(
+                      title: 'Diğer',
+                      child: Column(
+                        children: [
+                          _InfoRow(
+                            icon: Icons.help_outline_rounded,
+                            label: 'Yardım & Destek',
+                            onTap: _showSupport,
+                          ),
+                          _InfoRow(
+                            icon: Icons.star_outline_rounded,
+                            label: 'Uygulamayı Değerlendir',
+                            onTap: _showRateDialog,
+                          ),
+                          _InfoRow(
+                            icon: Icons.info_outline_rounded,
+                            label: 'Versiyon',
+                            value: '1.0.0',
+                            showArrow: false,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                      child:
+                          _isLoggingOut
+                              ? const Center(
                                 child: CircularProgressIndicator(
                                   color: AppColors.accent,
                                   strokeWidth: 2,
                                 ),
                               )
-                            : GestureDetector(
+                              : GestureDetector(
                                 onTap: _logout,
                                 child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 15),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 15,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.mainDark,
                                     borderRadius: BorderRadius.circular(16),
@@ -1069,10 +1095,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ),
                                 ),
                               ),
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
     );
   }
 }
@@ -1113,15 +1139,9 @@ class _SupportTile extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(
-          color: AppColors.muted,
-          fontSize: 12,
-        ),
+        style: const TextStyle(color: AppColors.muted, fontSize: 12),
       ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: AppColors.muted,
-      ),
+      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
       onTap: onTap,
     );
   }
@@ -1282,10 +1302,7 @@ class _IconBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _IconBtn({
-    required this.icon,
-    required this.onTap,
-  });
+  const _IconBtn({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1309,10 +1326,7 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatCard({
-    required this.label,
-    required this.value,
-  });
+  const _StatCard({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1354,10 +1368,7 @@ class _Section extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _Section({
-    required this.title,
-    required this.child,
-  });
+  const _Section({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1414,14 +1425,12 @@ class _InfoRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          border: isLast
-              ? null
-              : const Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFF1F1F1),
-                    width: 0.6,
+          border:
+              isLast
+                  ? null
+                  : const Border(
+                    bottom: BorderSide(color: Color(0xFFF1F1F1), width: 0.6),
                   ),
-                ),
         ),
         child: Row(
           children: [
@@ -1495,14 +1504,12 @@ class _ToggleRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(
-                  color: Color(0xFFF1F1F1),
-                  width: 0.6,
+        border:
+            isLast
+                ? null
+                : const Border(
+                  bottom: BorderSide(color: Color(0xFFF1F1F1), width: 0.6),
                 ),
-              ),
       ),
       child: Row(
         children: [

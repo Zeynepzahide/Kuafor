@@ -23,36 +23,8 @@ class CustomerHomePage extends StatefulWidget {
 class _CustomerHomePageState extends State<CustomerHomePage> {
   final _authService = AuthService();
   final _salonService = SalonService();
-
-  static final List<Map<String, dynamic>> _demoSalons = [
-    {
-      'id': -101,
-      'name': 'Stilist Studio Nisantasi',
-      'address': 'Tesvikiye Mah. Valikonagi Cad. No: 18',
-      'latitude': 41.0518,
-      'longitude': 28.9936,
-      'distanceKm': 2.4,
-      'isDemo': true,
-    },
-    {
-      'id': -102,
-      'name': 'Luna Beauty Lounge',
-      'address': 'Bagdat Cad. Suadiye, Kadikoy',
-      'latitude': 40.9634,
-      'longitude': 29.0831,
-      'distanceKm': 5.8,
-      'isDemo': true,
-    },
-    {
-      'id': -103,
-      'name': 'Mia Nail & Hair',
-      'address': 'Atasehir Bulvari No: 42',
-      'latitude': 40.9922,
-      'longitude': 29.1244,
-      'distanceKm': 8.1,
-      'isDemo': true,
-    },
-  ];
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   String _userName = '';
   String _profileImageUrl = '';
@@ -63,9 +35,29 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   double? _userLat;
   double? _userLng;
   String? _locationError;
+  String _searchQuery = '';
 
-  List<dynamic> get _visibleSalons => _salons.isEmpty ? _demoSalons : _salons;
-  bool get _showingDemoSalons => _salons.isEmpty;
+  List<dynamic> get _visibleSalons => _salons;
+  List<dynamic> get _filteredSalons {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _visibleSalons;
+
+    return _visibleSalons.where((salon) {
+      final name = (salon['name'] ?? '').toString().toLowerCase();
+      final address = (salon['address'] ?? '').toString().toLowerCase();
+      final description = (salon['description'] ?? '').toString().toLowerCase();
+      return name.contains(query) ||
+          address.contains(query) ||
+          description.contains(query);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -164,6 +156,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   void _openMap() {
+    FocusScope.of(context).unfocus();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -236,7 +229,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
-          children: [_buildHeader(), _buildActionButtons(), _buildSalonList()],
+          children: [
+            _buildHeader(),
+            _buildSearchBar(),
+            _buildActionButtons(),
+            _buildSalonList(),
+          ],
         ),
       ),
     );
@@ -315,9 +313,64 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onSubmitted: (_) => _searchFocusNode.unfocus(),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Salon, semt veya hizmet ara',
+            hintStyle: const TextStyle(color: AppColors.muted, fontSize: 13),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.accent,
+            ),
+            suffixIcon:
+                _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        _searchFocusNode.unfocus();
+                        setState(() => _searchQuery = '');
+                      },
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.muted,
+                        size: 20,
+                      ),
+                    ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       child: Column(
         children: [
           Row(
@@ -347,7 +400,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 'Mesajlar',
                 () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const MessagesScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => MessagesScreen(userId: _userId),
+                  ),
                 ),
                 locked: widget.guestMode,
               ),
@@ -455,7 +510,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
                 if (!_loading)
                   TextButton(
-                    onPressed: _nearbyMode ? _loadAllSalons : _loadNearbySalons,
+                    onPressed: () {
+                      FocusScope.of(context).unfocus();
+                      _nearbyMode ? _loadAllSalons() : _loadNearbySalons();
+                    },
                     child: Text(
                       _nearbyMode ? 'Tümünü Gör' : 'Yakındakiler',
                       style: const TextStyle(
@@ -484,17 +542,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount:
-                          _visibleSalons.length + (_showingDemoSalons ? 1 : 0),
+                          _filteredSalons.isEmpty ? 1 : _filteredSalons.length,
                       itemBuilder: (_, i) {
-                        if (_showingDemoSalons && i == 0) {
-                          return _DemoNotice(
-                            title: 'Ornek salonlar gosteriliyor',
-                            message:
-                                'Canli salon verisi gelince bu liste otomatik olarak gercek salonlarla degisir.',
-                          );
+                        if (_filteredSalons.isEmpty) {
+                          return _searchQuery.trim().isEmpty
+                              ? const _EmptySalonResult()
+                              : _EmptySearchResult(query: _searchQuery);
                         }
-                        final salonIndex = _showingDemoSalons ? i - 1 : i;
-                        return _buildSalonCard(_visibleSalons[salonIndex]);
+                        return _buildSalonCard(_filteredSalons[i]);
                       },
                     ),
           ),
@@ -508,21 +563,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final address = salon['address'] ?? '';
     final distanceKm = salon['distanceKm'];
     final salonId = salon['id'] ?? 0;
-    final isDemo = salon['isDemo'] == true;
 
     return GestureDetector(
       onTap: () {
-        if (isDemo) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Bu ornek salon. Gercek salon eklendiginde detay acilir.',
-              ),
-            ),
-          );
-          return;
-        }
-
+        FocusScope.of(context).unfocus();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -606,54 +650,79 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 }
 
-class _DemoNotice extends StatelessWidget {
-  final String title;
-  final String message;
+class _EmptySearchResult extends StatelessWidget {
+  final String query;
 
-  const _DemoNotice({required this.title, required this.message});
+  const _EmptySearchResult({required this.query});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.22)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
           const Icon(
-            Icons.info_outline_rounded,
+            Icons.search_off_rounded,
             color: AppColors.accent,
-            size: 18,
+            size: 34,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            '"$query" icin salon bulunamadi',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Salon adi, semt veya adresle tekrar deneyin.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptySalonResult extends StatelessWidget {
+  const _EmptySalonResult();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.storefront_outlined, color: AppColors.accent, size: 34),
+          SizedBox(height: 10),
+          Text(
+            'Henüz salon bulunamadı',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Canlı salon eklendiğinde burada listelenecek.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -962,17 +1031,25 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
                                 'Pending')
                             .toString();
                     final salonName =
-                        a['salon']?['name'] ?? a['Salon']?['Name'] ?? 'Salon';
+                        (a['salonName'] ??
+                                a['SalonName'] ??
+                                a['salon']?['name'] ??
+                                a['Salon']?['Name'] ??
+                                '')
+                            .toString();
                     final serviceName =
-                        a['service']?['name'] ??
-                        a['Service']?['Name'] ??
-                        'Hizmet';
+                        (a['serviceName'] ??
+                                a['ServiceName'] ??
+                                a['service']?['name'] ??
+                                a['Service']?['Name'] ??
+                                '')
+                            .toString();
                     final dateStr =
                         (a['appointmentDate'] ?? a['AppointmentDate'] ?? '')
                             as String;
                     DateTime? date;
                     try {
-                      date = DateTime.parse(dateStr);
+                      date = DateTime.parse(dateStr).toLocal();
                     } catch (_) {}
                     final canCancel =
                         status == 'Pending' ||
@@ -1021,7 +1098,9 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      salonName,
+                                      salonName.isEmpty
+                                          ? 'Salon bilgisi bekleniyor'
+                                          : salonName,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
@@ -1030,7 +1109,9 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      serviceName,
+                                      serviceName.isEmpty
+                                          ? 'Hizmet bilgisi bekleniyor'
+                                          : serviceName,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AppColors.muted,

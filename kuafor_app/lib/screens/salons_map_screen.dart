@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widgets/app_widgets.dart';
 import '../screens/salon_detail_screen.dart';
@@ -27,23 +28,32 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
   Set<Marker> _markers = {};
   bool _mapError = false;
   bool _mapReady = false;
+  bool _locating = false;
+  double? _userLat;
+  double? _userLng;
+  String? _locationMessage;
 
   static const LatLng _defaultCenter = LatLng(41.0082, 28.9784);
 
   @override
   void initState() {
     super.initState();
+    _userLat = widget.userLat;
+    _userLng = widget.userLng;
     _buildMarkers();
+    if (_userLat == null || _userLng == null) {
+      _loadMyLocation(moveCamera: false);
+    }
   }
 
   void _buildMarkers() {
     final markers = <Marker>{};
 
-    if (widget.userLat != null && widget.userLng != null) {
+    if (_userLat != null && _userLng != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('user_location'),
-          position: LatLng(widget.userLat!, widget.userLng!),
+          position: LatLng(_userLat!, _userLng!),
           infoWindow: const InfoWindow(title: 'Konumunuz'),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueAzure,
@@ -76,12 +86,16 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
       );
     }
 
-    setState(() => _markers = markers);
+    if (mounted) {
+      setState(() => _markers = markers);
+    } else {
+      _markers = markers;
+    }
   }
 
   LatLng get _initialCenter {
-    if (widget.userLat != null && widget.userLng != null) {
-      return LatLng(widget.userLat!, widget.userLng!);
+    if (_userLat != null && _userLng != null) {
+      return LatLng(_userLat!, _userLng!);
     }
     for (final salon in widget.salons) {
       final lat = salon['latitude'];
@@ -95,14 +109,77 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
 
   void _goToMyLocation() {
     if (_mapController == null) return;
-    if (widget.userLat != null && widget.userLng != null) {
+    if (_userLat != null && _userLng != null) {
       _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(widget.userLat!, widget.userLng!),
-          14,
+        CameraUpdate.newLatLngZoom(LatLng(_userLat!, _userLng!), 14),
+      );
+    } else {
+      _loadMyLocation(moveCamera: true);
+    }
+  }
+
+  Future<void> _loadMyLocation({required bool moveCamera}) async {
+    if (_locating) return;
+    setState(() {
+      _locating = true;
+      _locationMessage = null;
+    });
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _setLocationFailure('Konum servisi kapalı.');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _setLocationFailure('Konum izni verilmedi.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
         ),
       );
+
+      if (!mounted) return;
+      setState(() {
+        _userLat = position.latitude;
+        _userLng = position.longitude;
+        _locating = false;
+        _locationMessage = null;
+      });
+      _buildMarkers();
+
+      if (moveCamera || _salonsWithCoords == 0) {
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(
+            LatLng(position.latitude, position.longitude),
+            14,
+          ),
+        );
+      }
+    } catch (_) {
+      _setLocationFailure('Konum alınamadı. Cihaz konumunu kontrol edin.');
     }
+  }
+
+  void _setLocationFailure(String message) {
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      _locationMessage = message;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   int get _salonsWithCoords =>
@@ -169,14 +246,42 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
           const Center(
             child: CircularProgressIndicator(color: AppColors.accent),
           ),
-        if (_mapReady && widget.userLat != null && widget.userLng != null)
+        if (_mapReady)
           Positioned(
             bottom: _selectedSalon != null ? 200 : 24,
             right: 16,
             child: FloatingActionButton.small(
               backgroundColor: AppColors.primary,
               onPressed: _goToMyLocation,
-              child: const Icon(Icons.my_location, color: AppColors.white),
+              child:
+                  _locating
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: AppColors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : const Icon(Icons.my_location, color: AppColors.white),
+            ),
+          ),
+        if (_locationMessage != null)
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                _locationMessage!,
+                style: const TextStyle(color: AppColors.primary, fontSize: 12),
+              ),
             ),
           ),
         if (_selectedSalon != null)
@@ -201,6 +306,7 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
         },
         initialCameraPosition: CameraPosition(target: _initialCenter, zoom: 13),
         markers: _markers,
+        myLocationEnabled: _userLat != null && _userLng != null,
         myLocationButtonEnabled: false,
         zoomControlsEnabled: true,
         onTap: (_) {
@@ -222,21 +328,9 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
     final address = salon['address'] ?? '';
     final distanceKm = salon['distanceKm'];
     final salonId = salon['id'] ?? 0;
-    final isDemo = salon['isDemo'] == true;
 
     return GestureDetector(
       onTap: () {
-        if (isDemo) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Bu ornek salon. Gercek salon eklendiginde detay acilir.',
-              ),
-            ),
-          );
-          return;
-        }
-
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -333,23 +427,11 @@ class _SalonsMapScreenState extends State<SalonsMapScreen> {
   }
 
   Widget _buildSalonListTile(Map<String, dynamic> salon) {
-    final isDemo = salon['isDemo'] == true;
     return ListTile(
       leading: const Icon(Icons.content_cut, color: AppColors.accent),
       title: Text(salon['name'] ?? ''),
       subtitle: Text(salon['address'] ?? ''),
       onTap: () {
-        if (isDemo) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Bu ornek salon. Gercek salon eklendiginde detay acilir.',
-              ),
-            ),
-          );
-          return;
-        }
-
         Navigator.push(
           context,
           MaterialPageRoute(
