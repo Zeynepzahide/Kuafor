@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class CampaignService {
-  static const String _base = 'https://kuafor-019f.onrender.com/api';
+  static const String _base = 'https://kuaforapi.onrender.com/api';
+
   final AuthService _authService = AuthService();
 
   Future<Map<String, String>> _headers() async {
@@ -61,16 +62,15 @@ class CampaignService {
   }) async {
     try {
       final body = {
-        'salonId': salonId,
+        if (salonId > 0) 'salonId': salonId,
         'title': title.trim(),
         'description': description.trim(),
         if (code != null && code.trim().isNotEmpty)
           'code': code.trim().toUpperCase(),
         'discountPercent': discountPercent,
-        'startDate': startDate.toIso8601String(),
-        'endDate': endDate?.toIso8601String(),
+        'startDate': startDate.toUtc().toIso8601String(),
+        'endDate': endDate?.toUtc().toIso8601String(),
         'usageLimit': usageLimit,
-        'usedCount': 0,
         'isActive': true,
       };
 
@@ -86,7 +86,10 @@ class CampaignService {
 
       return (
         success: false,
-        error: _extractErrorMessage(res.body, 'Sunucu hatası: ${res.statusCode}'),
+        error: _extractErrorMessage(
+          res.body,
+          'Sunucu hatası: ${res.statusCode}',
+        ),
       );
     } catch (e) {
       return (success: false, error: e.toString());
@@ -170,7 +173,9 @@ class CampaignService {
       final decoded = jsonDecode(body);
 
       if (decoded is Map<String, dynamic>) {
-        return decoded['message']?.toString() ?? fallback;
+        return decoded['message']?.toString() ??
+            decoded['detail']?.toString() ??
+            fallback;
       }
 
       return fallback;
