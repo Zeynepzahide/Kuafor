@@ -61,11 +61,27 @@ public class CampaignController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateCampaign([FromBody] Campaign campaign)
     {
+        if (campaign == null)
+        {
+            return BadRequest(new
+            {
+                message = "Kampanya bilgileri alınamadı."
+            });
+        }
+
         if (string.IsNullOrWhiteSpace(campaign.Title))
         {
             return BadRequest(new
             {
                 message = "Kampanya başlığı zorunludur."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(campaign.Description))
+        {
+            return BadRequest(new
+            {
+                message = "Kampanya açıklaması zorunludur."
             });
         }
 
@@ -75,6 +91,11 @@ public class CampaignController : ControllerBase
             {
                 message = "İndirim oranı 0-100 arasında olmalıdır."
             });
+        }
+
+        if (campaign.StartDate == default)
+        {
+            campaign.StartDate = DateTime.UtcNow;
         }
 
         if (campaign.EndDate != null && campaign.EndDate < campaign.StartDate)
@@ -88,19 +109,68 @@ public class CampaignController : ControllerBase
         if (!string.IsNullOrWhiteSpace(campaign.Code))
         {
             campaign.Code = campaign.Code.Trim().ToUpperInvariant();
+
+            var codeExists = await _context.Campaigns.AnyAsync(c =>
+                c.Code != null &&
+                c.Code.ToUpper() == campaign.Code &&
+                c.IsActive);
+
+            if (codeExists)
+            {
+                return BadRequest(new
+                {
+                    message = "Bu kampanya kodu zaten kullanılıyor."
+                });
+            }
         }
 
+        if (campaign.SalonId.HasValue)
+        {
+            var salonExists = await _context.Salons.AnyAsync(
+                s => s.Id == campaign.SalonId.Value
+            );
+
+            if (!salonExists)
+            {
+                campaign.SalonId = null;
+            }
+        }
+
+        if (campaign.UsageLimit <= 0)
+        {
+            campaign.UsageLimit = 100;
+        }
+
+        campaign.UsedCount = 0;
         campaign.CreatedAt = DateTime.UtcNow;
         campaign.IsActive = true;
 
-        _context.Campaigns.Add(campaign);
-        await _context.SaveChangesAsync();
+        campaign.StartDate = DateTime.SpecifyKind(campaign.StartDate, DateTimeKind.Utc);
 
-        return Ok(new
+        if (campaign.EndDate.HasValue)
         {
-            message = "Kampanya başarıyla oluşturuldu.",
-            campaign
-        });
+            campaign.EndDate = DateTime.SpecifyKind(campaign.EndDate.Value, DateTimeKind.Utc);
+        }
+
+        try
+        {
+            _context.Campaigns.Add(campaign);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Kampanya başarıyla oluşturuldu.",
+                campaign
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Kampanya kaydedilirken hata oluştu.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
     }
 
     // GET: api/Campaign/validate-code?code=BAKIM15
@@ -124,17 +194,6 @@ public class CampaignController : ControllerBase
             .Where(c => c.StartDate <= now)
             .Where(c => c.EndDate == null || c.EndDate >= now)
             .OrderByDescending(c => c.DiscountPercent)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Description,
-                c.Code,
-                c.DiscountPercent,
-                c.StartDate,
-                c.EndDate,
-                c.SalonId
-            })
             .FirstOrDefaultAsync();
 
         if (campaign == null)
@@ -145,24 +204,52 @@ public class CampaignController : ControllerBase
             });
         }
 
+        if (campaign.UsedCount >= campaign.UsageLimit)
+        {
+            return BadRequest(new
+            {
+                message = "Kampanya kullanım limiti doldu."
+            });
+        }
+
         return Ok(new
         {
             success = true,
-            campaign
+            campaign = new
+            {
+                campaign.Id,
+                campaign.Title,
+                campaign.Description,
+                campaign.Code,
+                campaign.DiscountPercent,
+                campaign.StartDate,
+                campaign.EndDate,
+                campaign.SalonId,
+                campaign.UsageLimit,
+                campaign.UsedCount
+            }
         });
     }
 
     // PUT: api/Campaign/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateCampaign(
-        int id,
-        [FromBody] Campaign campaign)
+    public async Task<IActionResult> UpdateCampaign(int id, [FromBody] Campaign campaign)
     {
-        if (id != campaign.Id)
+        if (campaign == null)
         {
             return BadRequest(new
             {
-                message = "ID eşleşmiyor."
+                message = "Kampanya bilgileri alınamadı."
+            });
+        }
+
+        var existing = await _context.Campaigns.FindAsync(id);
+
+        if (existing == null)
+        {
+            return NotFound(new
+            {
+                message = "Kampanya bulunamadı."
             });
         }
 
@@ -190,17 +277,38 @@ public class CampaignController : ControllerBase
             });
         }
 
+        existing.Title = campaign.Title.Trim();
+        existing.Description = campaign.Description?.Trim() ?? "";
+        existing.DiscountPercent = campaign.DiscountPercent;
+        existing.StartDate = DateTime.SpecifyKind(campaign.StartDate, DateTimeKind.Utc);
+        existing.EndDate = campaign.EndDate.HasValue
+            ? DateTime.SpecifyKind(campaign.EndDate.Value, DateTimeKind.Utc)
+            : null;
+
+        existing.UsageLimit = campaign.UsageLimit <= 0
+            ? existing.UsageLimit
+            : campaign.UsageLimit;
+
         if (!string.IsNullOrWhiteSpace(campaign.Code))
         {
-            campaign.Code = campaign.Code.Trim().ToUpperInvariant();
+            existing.Code = campaign.Code.Trim().ToUpperInvariant();
         }
 
-        _context.Entry(campaign).State = EntityState.Modified;
+        if (campaign.SalonId.HasValue)
+        {
+            var salonExists = await _context.Salons.AnyAsync(
+                s => s.Id == campaign.SalonId.Value
+            );
+
+            existing.SalonId = salonExists ? campaign.SalonId : null;
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new
         {
-            message = "Kampanya güncellendi."
+            message = "Kampanya güncellendi.",
+            campaign = existing
         });
     }
 
