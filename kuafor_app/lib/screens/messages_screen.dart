@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/appointment_service.dart';
+import '../services/auth_service.dart';
 import '../services/message_service.dart';
 import '../widgets/app_widgets.dart';
 
@@ -34,12 +35,14 @@ class MessagesScreen extends StatefulWidget {
 }
 
 class _MessagesScreenState extends State<MessagesScreen> {
+  final AuthService _authService = AuthService();
   final MessageService _messageService = MessageService();
   final AppointmentService _appointmentService = AppointmentService();
   final Map<int, List<_ChatMessage>> _localMessages = {};
 
   bool _loading = true;
   bool _initialThreadOpened = false;
+  String _currentUserName = '';
   List<_MessageThread> _threads = [];
 
   @override
@@ -50,6 +53,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Future<void> _loadThreads() async {
     setState(() => _loading = true);
+    await _loadCurrentUserName();
 
     final data =
         widget.ownerMode
@@ -395,13 +399,31 @@ class _MessagesScreenState extends State<MessagesScreen> {
           _asInt(item['customerId']) == thread.customerId &&
           _normalizeThreadType(item['type']) == thread.type;
     });
-    final payload = thread.toLocalMap();
+    final payload = thread.toLocalMap(
+      customerName:
+          widget.ownerMode
+              ? null
+              : _currentUserName.trim().isEmpty
+              ? null
+              : _currentUserName.trim(),
+    );
     if (index >= 0) {
       list[index] = payload;
     } else {
       list.add(payload);
     }
     await prefs.setString(_localThreadsKey, jsonEncode(list));
+  }
+
+  Future<void> _loadCurrentUserName() async {
+    if (widget.ownerMode || _currentUserName.trim().isNotEmpty) return;
+
+    final token = await _authService.getToken();
+    if (token == null) return;
+
+    final user = await _authService.getUserInfo(token);
+    final name = (user?['name'] ?? user?['fullName'] ?? '').toString().trim();
+    if (name.isNotEmpty) _currentUserName = name;
   }
 
   _MessageThread _threadFromLocalMap(Map<dynamic, dynamic> map) {
@@ -984,14 +1006,14 @@ class _MessageThread {
     );
   }
 
-  Map<String, dynamic> toLocalMap() {
+  Map<String, dynamic> toLocalMap({String? customerName}) {
     return {
       'type': type,
       'salonId': salonId,
       'customerId': customerId,
       'title': title,
       'salonName': ownerMode ? subtitle : title,
-      'customerName': ownerMode ? title : 'Müşteri',
+      'customerName': ownerMode ? title : customerName ?? 'Müşteri',
       'serviceName': serviceName,
       'appointmentDate': appointmentDate.toIso8601String(),
       'appointmentCount': appointmentCount,
