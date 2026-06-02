@@ -9,9 +9,11 @@ namespace KuaforApi.Data
         {
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
-            optionsBuilder.UseNpgsql(
-                "Host=localhost;Database=tempdb;Username=temp;Password=temp"
-            );
+            var connectionString =
+                Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                ?? "Host=dpg-d85fgnjbc2fs73bpa39g-a.frankfurt-postgres.render.com;Port=5432;Database=kuafor_db_hs1b;Username=kuafor_db_hs1b_user;Password=rhxwiuImsCwRZa30z5DcfMXNw9uK12oi;SSL Mode=Require;Trust Server Certificate=true";
+
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new AppDbContext(optionsBuilder.Options);
         }
