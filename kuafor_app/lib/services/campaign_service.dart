@@ -1,439 +1,181 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using KuaforApi.Data;
-using KuaforApi.Models;
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
-namespace KuaforApi.Controllers;
+class CampaignService {
+  static const String _base = 'https://kuafor-019f.onrender.com/api';
+  final AuthService _authService = AuthService();
 
-[ApiController]
-[Route("api/[controller]")]
-public class CampaignController : ControllerBase
-{
-    private readonly AppDbContext _context;
+  Future<Map<String, String>> _headers() async {
+    final token = await _authService.getToken();
 
-    public CampaignController(AppDbContext context)
-    {
-        _context = context;
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<List<dynamic>> getCampaigns() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_base/Campaign'),
+        headers: await _headers(),
+      );
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as List<dynamic>;
+      }
+
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> getSalonCampaigns(int salonId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_base/Campaign/salon/$salonId'),
+        headers: await _headers(),
+      );
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as List<dynamic>;
+      }
+
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<({bool success, String? error})> createCampaign({
+    required int salonId,
+    required String title,
+    required String description,
+    String? code,
+    required int discountPercent,
+    required DateTime startDate,
+    DateTime? endDate,
+    int usageLimit = 100,
+  }) async {
+    try {
+      final body = {
+        'salonId': salonId,
+        'title': title.trim(),
+        'description': description.trim(),
+        if (code != null && code.trim().isNotEmpty)
+          'code': code.trim().toUpperCase(),
+        'discountPercent': discountPercent,
+        'startDate': startDate.toIso8601String(),
+        'endDate': endDate?.toIso8601String(),
+        'usageLimit': usageLimit,
+        'usedCount': 0,
+        'isActive': true,
+      };
+
+      final res = await http.post(
+        Uri.parse('$_base/Campaign'),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return (success: true, error: null);
+      }
+
+      return (
+        success: false,
+        error: _extractErrorMessage(res.body, 'Sunucu hatası: ${res.statusCode}'),
+      );
+    } catch (e) {
+      return (success: false, error: e.toString());
+    }
+  }
+
+  Future<({Map<String, dynamic>? campaign, String? error})> validateCode(
+    String code,
+  ) async {
+    final trimmedCode = code.trim();
+
+    if (trimmedCode.isEmpty) {
+      return (campaign: null, error: 'Kampanya kodu giriniz');
     }
 
-    // GET: api/Campaign
-    [HttpGet]
-    public async Task<IActionResult> GetAllCampaigns()
-    {
-        var campaigns = await _context.Campaigns
-            .Where(c => c.IsActive)
-            .OrderByDescending(c => c.StartDate)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Description,
-                c.Code,
-                c.DiscountPercent,
-                c.CreatedAt,
-                c.IsActive,
-                c.StartDate,
-                c.EndDate,
-                c.UsageLimit,
-                c.UsedCount,
-                c.SalonId
-            })
-            .ToListAsync();
+    try {
+      final uri = Uri.parse('$_base/Campaign/validate-code').replace(
+        queryParameters: {
+          'code': trimmedCode.toUpperCase(),
+        },
+      );
 
-        return Ok(campaigns);
+      final res = await http.get(
+        uri,
+        headers: await _headers(),
+      );
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+
+        if (decoded['success'] == true && decoded['campaign'] != null) {
+          return (
+            campaign: decoded['campaign'] as Map<String, dynamic>,
+            error: null,
+          );
+        }
+
+        return (
+          campaign: decoded,
+          error: null,
+        );
+      }
+
+      return (
+        campaign: null,
+        error: _extractErrorMessage(res.body, 'Kod geçersiz'),
+      );
+    } catch (_) {
+      return (campaign: null, error: 'Bağlantı hatası');
     }
+  }
 
-    // GET: api/Campaign/salon/5
-    [HttpGet("salon/{salonId}")]
-    public async Task<IActionResult> GetSalonCampaigns(int salonId)
-    {
-        var campaigns = await _context.Campaigns
-            .Where(c => c.SalonId == salonId && c.IsActive)
-            .OrderByDescending(c => c.StartDate)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Description,
-                c.Code,
-                c.DiscountPercent,
-                c.CreatedAt,
-                c.IsActive,
-                c.StartDate,
-                c.EndDate,
-                c.UsageLimit,
-                c.UsedCount,
-                c.SalonId
-            })
-            .ToListAsync();
+  Future<bool> deactivateCampaign(int campaignId) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$_base/Campaign/$campaignId/deactivate'),
+        headers: await _headers(),
+      );
 
-        return Ok(campaigns);
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
     }
+  }
 
-    // GET: api/Campaign/5
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetCampaign(int id)
-    {
-        var campaign = await _context.Campaigns
-            .Where(c => c.Id == id)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Description,
-                c.Code,
-                c.DiscountPercent,
-                c.CreatedAt,
-                c.IsActive,
-                c.StartDate,
-                c.EndDate,
-                c.UsageLimit,
-                c.UsedCount,
-                c.SalonId
-            })
-            .FirstOrDefaultAsync();
+  Future<bool> deleteCampaign(int campaignId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('$_base/Campaign/$campaignId'),
+        headers: await _headers(),
+      );
 
-        if (campaign == null)
-        {
-            return NotFound(new
-            {
-                message = "Kampanya bulunamadı."
-            });
-        }
-
-        return Ok(campaign);
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) {
+      return false;
     }
+  }
 
-    // POST: api/Campaign
-    [HttpPost]
-    public async Task<IActionResult> CreateCampaign([FromBody] CampaignRequest request)
-    {
-        if (request == null)
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya bilgileri alınamadı."
-            });
-        }
+  String _extractErrorMessage(String body, String fallback) {
+    try {
+      final decoded = jsonDecode(body);
 
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya başlığı zorunludur."
-            });
-        }
+      if (decoded is Map<String, dynamic>) {
+        return decoded['message']?.toString() ?? fallback;
+      }
 
-        if (string.IsNullOrWhiteSpace(request.Description))
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya açıklaması zorunludur."
-            });
-        }
-
-        if (request.DiscountPercent < 0 || request.DiscountPercent > 100)
-        {
-            return BadRequest(new
-            {
-                message = "İndirim oranı 0-100 arasında olmalıdır."
-            });
-        }
-
-        var startDate = request.StartDate ?? DateTime.UtcNow;
-        var endDate = request.EndDate;
-
-        if (endDate != null && endDate < startDate)
-        {
-            return BadRequest(new
-            {
-                message = "Bitiş tarihi başlangıçtan önce olamaz."
-            });
-        }
-
-        string? normalizedCode = null;
-
-        if (!string.IsNullOrWhiteSpace(request.Code))
-        {
-            normalizedCode = request.Code.Trim().ToUpperInvariant();
-
-            var codeExists = await _context.Campaigns.AnyAsync(c =>
-                c.Code != null &&
-                c.Code.ToUpper() == normalizedCode &&
-                c.IsActive);
-
-            if (codeExists)
-            {
-                return BadRequest(new
-                {
-                    message = "Bu kampanya kodu zaten kullanılıyor."
-                });
-            }
-        }
-
-        int usageLimit = request.UsageLimit <= 0 ? 100 : request.UsageLimit;
-
-        int? salonId = request.SalonId;
-
-        if (salonId.HasValue && salonId.Value <= 0)
-        {
-            salonId = null;
-        }
-
-        if (salonId.HasValue)
-        {
-            var salonExists = await _context.Salons.AnyAsync(s => s.Id == salonId.Value);
-
-            if (!salonExists)
-            {
-                salonId = null;
-            }
-        }
-
-        var campaign = new Campaign
-        {
-            Title = request.Title.Trim(),
-            Description = request.Description.Trim(),
-            Code = normalizedCode,
-            DiscountPercent = request.DiscountPercent,
-            CreatedAt = DateTime.UtcNow,
-            IsActive = true,
-            StartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc),
-            EndDate = endDate.HasValue
-                ? DateTime.SpecifyKind(endDate.Value, DateTimeKind.Utc)
-                : null,
-            UsageLimit = usageLimit,
-            UsedCount = 0,
-            SalonId = salonId
-        };
-
-        try
-        {
-            _context.Campaigns.Add(campaign);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Kampanya başarıyla oluşturuldu.",
-                campaign = new
-                {
-                    campaign.Id,
-                    campaign.Title,
-                    campaign.Description,
-                    campaign.Code,
-                    campaign.DiscountPercent,
-                    campaign.CreatedAt,
-                    campaign.IsActive,
-                    campaign.StartDate,
-                    campaign.EndDate,
-                    campaign.UsageLimit,
-                    campaign.UsedCount,
-                    campaign.SalonId
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new
-            {
-                message = "Kampanya kaydedilirken hata oluştu.",
-                detail = ex.InnerException?.Message ?? ex.Message
-            });
-        }
+      return fallback;
+    } catch (_) {
+      return fallback;
     }
-
-    // GET: api/Campaign/validate-code?code=BAKIM15
-    [HttpGet("validate-code")]
-    public async Task<IActionResult> ValidateCode([FromQuery] string code)
-    {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya kodu zorunludur."
-            });
-        }
-
-        var now = DateTime.UtcNow;
-        var normalized = code.Trim().ToUpperInvariant();
-
-        var campaign = await _context.Campaigns
-            .Where(c => c.IsActive)
-            .Where(c => c.Code != null && c.Code.ToUpper() == normalized)
-            .Where(c => c.StartDate <= now)
-            .Where(c => c.EndDate == null || c.EndDate >= now)
-            .OrderByDescending(c => c.DiscountPercent)
-            .Select(c => new
-            {
-                c.Id,
-                c.Title,
-                c.Description,
-                c.Code,
-                c.DiscountPercent,
-                c.StartDate,
-                c.EndDate,
-                c.SalonId,
-                c.UsageLimit,
-                c.UsedCount
-            })
-            .FirstOrDefaultAsync();
-
-        if (campaign == null)
-        {
-            return NotFound(new
-            {
-                message = "Geçerli kampanya bulunamadı."
-            });
-        }
-
-        if (campaign.UsedCount >= campaign.UsageLimit)
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya kullanım limiti doldu."
-            });
-        }
-
-        return Ok(new
-        {
-            success = true,
-            campaign
-        });
-    }
-
-    // PUT: api/Campaign/5
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateCampaign(
-        int id,
-        [FromBody] CampaignRequest request)
-    {
-        var campaign = await _context.Campaigns.FindAsync(id);
-
-        if (campaign == null)
-        {
-            return NotFound(new
-            {
-                message = "Kampanya bulunamadı."
-            });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest(new
-            {
-                message = "Kampanya başlığı zorunludur."
-            });
-        }
-
-        if (request.DiscountPercent < 0 || request.DiscountPercent > 100)
-        {
-            return BadRequest(new
-            {
-                message = "İndirim oranı 0-100 arasında olmalıdır."
-            });
-        }
-
-        var startDate = request.StartDate ?? campaign.StartDate;
-        var endDate = request.EndDate;
-
-        if (endDate != null && endDate < startDate)
-        {
-            return BadRequest(new
-            {
-                message = "Bitiş tarihi başlangıçtan önce olamaz."
-            });
-        }
-
-        campaign.Title = request.Title.Trim();
-        campaign.Description = request.Description?.Trim() ?? "";
-        campaign.DiscountPercent = request.DiscountPercent;
-        campaign.StartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-        campaign.EndDate = endDate.HasValue
-            ? DateTime.SpecifyKind(endDate.Value, DateTimeKind.Utc)
-            : null;
-        campaign.UsageLimit = request.UsageLimit <= 0 ? campaign.UsageLimit : request.UsageLimit;
-
-        if (!string.IsNullOrWhiteSpace(request.Code))
-        {
-            campaign.Code = request.Code.Trim().ToUpperInvariant();
-        }
-
-        if (request.SalonId.HasValue && request.SalonId.Value > 0)
-        {
-            campaign.SalonId = request.SalonId.Value;
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            message = "Kampanya güncellendi.",
-            campaign
-        });
-    }
-
-    // DELETE: api/Campaign/5
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCampaign(int id)
-    {
-        var campaign = await _context.Campaigns.FindAsync(id);
-
-        if (campaign == null)
-        {
-            return NotFound(new
-            {
-                message = "Kampanya bulunamadı."
-            });
-        }
-
-        _context.Campaigns.Remove(campaign);
-        await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            message = "Kampanya silindi."
-        });
-    }
-
-    // PUT: api/Campaign/5/deactivate
-    [HttpPut("{id}/deactivate")]
-    public async Task<IActionResult> DeactivateCampaign(int id)
-    {
-        var campaign = await _context.Campaigns.FindAsync(id);
-
-        if (campaign == null)
-        {
-            return NotFound(new
-            {
-                message = "Kampanya bulunamadı."
-            });
-        }
-
-        campaign.IsActive = false;
-        await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            message = "Kampanya devre dışı bırakıldı."
-        });
-    }
-}
-
-public class CampaignRequest
-{
-    public string Title { get; set; } = "";
-
-    public string Description { get; set; } = "";
-
-    public string? Code { get; set; }
-
-    public int DiscountPercent { get; set; }
-
-    public DateTime? StartDate { get; set; }
-
-    public DateTime? EndDate { get; set; }
-
-    public int UsageLimit { get; set; } = 100;
-
-    public int? SalonId { get; set; }
+  }
 }
