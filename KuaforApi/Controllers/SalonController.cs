@@ -87,6 +87,7 @@ public class SalonController : ControllerBase
     }
 
     // Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
+    // Bu sürüm Render'da hata vermemesi için sadece Salons tablosunu kullanır.
     [HttpGet("recommended")]
     public async Task<IActionResult> GetRecommendedSalons(
         [FromQuery] double? latitude,
@@ -129,50 +130,49 @@ public class SalonController : ControllerBase
                 distanceScore = Math.Max(0, 100 - (distanceKm * 10));
             }
 
-            double averageRating = await _context.Reviews
-                .Where(r => r.SalonId == salon.Id)
-                .Select(r => (double?)r.Rating)
-                .AverageAsync() ?? 0;
-
-            int reviewCount = await _context.Reviews
-                .CountAsync(r => r.SalonId == salon.Id);
-
-            int serviceCount = await _context.Services
-                .CountAsync(s => s.SalonId == salon.Id);
-
-            // Render tarafında Campaigns tablosu/modeli hata verdiği için
-            // kampanya puanını şimdilik devre dışı bırakıyoruz.
-            int campaignCount = 0;
-
-            double ratingScore = averageRating * 20;
-            double reviewScore = Math.Min(reviewCount * 5, 100);
-            double campaignScore = 0;
-            double serviceMatchScore = 50;
+            double searchScore = 50;
 
             if (!string.IsNullOrWhiteSpace(serviceName))
             {
                 string search = serviceName.ToLower();
 
-                bool hasMatchingService = await _context.Services
-                    .AnyAsync(s =>
-                        s.SalonId == salon.Id &&
-                        s.Name.ToLower().Contains(search));
+                bool matchesSearch =
+                    (!string.IsNullOrWhiteSpace(salon.Name) &&
+                     salon.Name.ToLower().Contains(search)) ||
+                    (!string.IsNullOrWhiteSpace(salon.Description) &&
+                     salon.Description.ToLower().Contains(search)) ||
+                    (!string.IsNullOrWhiteSpace(salon.Address) &&
+                     salon.Address.ToLower().Contains(search));
 
-                serviceMatchScore = hasMatchingService ? 100 : 20;
+                searchScore = matchesSearch ? 100 : 40;
             }
 
-            double finalScore =
-                (distanceScore * 0.35) +
-                (ratingScore * 0.25) +
-                (reviewScore * 0.15) +
-                (serviceMatchScore * 0.15) +
-                (campaignScore * 0.10);
+            double profileScore = 0;
 
-            string reason = BuildRecommendationReason(
+            if (!string.IsNullOrWhiteSpace(salon.Name))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.Address))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.Description))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.ImageUrl))
+                profileScore += 25;
+
+            double finalScore =
+                (distanceScore * 0.50) +
+                (searchScore * 0.30) +
+                (profileScore * 0.20);
+
+            string reason = BuildSimpleRecommendationReason(
                 distanceKm,
-                averageRating,
-                campaignCount,
-                serviceMatchScore
+                salon.Name,
+                salon.Address,
+                salon.Description,
+                salon.ImageUrl,
+                serviceName
             );
 
             recommendedSalons.Add(new RecommendedSalonDto
@@ -185,10 +185,12 @@ public class SalonController : ControllerBase
                 OwnerId = salon.OwnerId,
                 Latitude = salon.Latitude,
                 Longitude = salon.Longitude,
-                AverageRating = Math.Round(averageRating, 1),
-                ReviewCount = reviewCount,
-                CampaignCount = campaignCount,
-                ServiceCount = serviceCount,
+
+                AverageRating = 0,
+                ReviewCount = 0,
+                CampaignCount = 0,
+                ServiceCount = 0,
+
                 DistanceKm = Math.Round(distanceKm, 2),
                 RecommendationScore = Math.Round(finalScore, 2),
                 RecommendationReason = reason
@@ -440,28 +442,46 @@ public class SalonController : ControllerBase
         return deg * Math.PI / 180.0;
     }
 
-    private static string BuildRecommendationReason(
+    private static string BuildSimpleRecommendationReason(
         double distanceKm,
-        double averageRating,
-        int campaignCount,
-        double serviceMatchScore)
+        string? salonName,
+        string? address,
+        string? description,
+        string? imageUrl,
+        string? serviceName)
     {
         var reasons = new List<string>();
 
         if (distanceKm > 0 && distanceKm <= 5)
             reasons.Add("konumuna yakın");
 
-        if (averageRating >= 4)
-            reasons.Add("puanı yüksek");
+        if (!string.IsNullOrWhiteSpace(description))
+            reasons.Add("salon bilgileri tamamlanmış");
 
-        if (campaignCount > 0)
-            reasons.Add("kampanyalı hizmet sunuyor");
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+            reasons.Add("görsel bilgisi mevcut");
 
-        if (serviceMatchScore >= 100)
-            reasons.Add("aradığın hizmetle uyumlu");
+        if (!string.IsNullOrWhiteSpace(address))
+            reasons.Add("adres bilgisi mevcut");
+
+        if (!string.IsNullOrWhiteSpace(serviceName))
+        {
+            string search = serviceName.ToLower();
+
+            bool matchesSearch =
+                (!string.IsNullOrWhiteSpace(salonName) &&
+                 salonName.ToLower().Contains(search)) ||
+                (!string.IsNullOrWhiteSpace(description) &&
+                 description.ToLower().Contains(search)) ||
+                (!string.IsNullOrWhiteSpace(address) &&
+                 address.ToLower().Contains(search));
+
+            if (matchesSearch)
+                reasons.Add("arama kriterinle uyumlu");
+        }
 
         if (!reasons.Any())
-            return "Genel puanlama kriterlerine göre önerildi.";
+            return "Genel salon bilgilerine göre önerildi.";
 
         return "Bu salon sana önerildi çünkü " + string.Join(", ", reasons) + ".";
     }
