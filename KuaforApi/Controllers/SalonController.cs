@@ -87,25 +87,32 @@ public class SalonController : ControllerBase
     }
 
     // Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
-    // Bu sürüm Render'da hata vermemesi için sadece Salons tablosunu kullanır.
-    // EN BASİT TEST SÜRÜMÜ
-    // Sadece Salons tablosunu kullanır.
+    // TEST SÜRÜMÜ: Veritabanına bağlanmaz.
+    // Önce Render'da endpoint'in sorunsuz çalışıp çalışmadığını görmek için kullanılır.
     [HttpGet("recommended")]
-    public async Task<IActionResult> GetRecommendedSalons()
+    public IActionResult GetRecommendedSalons()
     {
-        var salons = await _context.Salons
-            .Select(s => new
+        var recommendedSalons = new List<object>
+        {
+            new
             {
-                salonId = s.Id,
-                salonName = s.Name,
-                address = s.Address,
-                recommendationScore = 80,
-                recommendationReason = "Bu salon genel salon bilgilerine göre önerildi."
-            })
-            .Take(10)
-            .ToListAsync();
+                salonId = 1,
+                salonName = "Test Kuaför",
+                address = "İstanbul",
+                recommendationScore = 85,
+                recommendationReason = "Bu salon test amaçlı önerildi."
+            },
+            new
+            {
+                salonId = 2,
+                salonName = "Önerilen Salon",
+                address = "İstanbul",
+                recommendationScore = 75,
+                recommendationReason = "Bu salon genel öneri algoritmasına göre listelendi."
+            }
+        };
 
-        return Ok(salons);
+        return Ok(recommendedSalons);
     }
 
     [HttpGet("{id}")]
@@ -344,50 +351,6 @@ public class SalonController : ControllerBase
     {
         return deg * Math.PI / 180.0;
     }
-
-    private static string BuildSimpleRecommendationReason(
-        double distanceKm,
-        string? salonName,
-        string? address,
-        string? description,
-        string? imageUrl,
-        string? serviceName)
-    {
-        var reasons = new List<string>();
-
-        if (distanceKm > 0 && distanceKm <= 5)
-            reasons.Add("konumuna yakın");
-
-        if (!string.IsNullOrWhiteSpace(description))
-            reasons.Add("salon bilgileri tamamlanmış");
-
-        if (!string.IsNullOrWhiteSpace(imageUrl))
-            reasons.Add("görsel bilgisi mevcut");
-
-        if (!string.IsNullOrWhiteSpace(address))
-            reasons.Add("adres bilgisi mevcut");
-
-        if (!string.IsNullOrWhiteSpace(serviceName))
-        {
-            string search = serviceName.ToLower();
-
-            bool matchesSearch =
-                (!string.IsNullOrWhiteSpace(salonName) &&
-                 salonName.ToLower().Contains(search)) ||
-                (!string.IsNullOrWhiteSpace(description) &&
-                 description.ToLower().Contains(search)) ||
-                (!string.IsNullOrWhiteSpace(address) &&
-                 address.ToLower().Contains(search));
-
-            if (matchesSearch)
-                reasons.Add("arama kriterinle uyumlu");
-        }
-
-        if (!reasons.Any())
-            return "Genel salon bilgilerine göre önerildi.";
-
-        return "Bu salon sana önerildi çünkü " + string.Join(", ", reasons) + ".";
-    }
 }
 
 public class UpdateSalonRequest
@@ -407,26 +370,4 @@ public class ServiceDto
     public decimal Price { get; set; }
     public int DurationMinutes { get; set; }
     public string? StylistName { get; set; }
-}
-
-public class RecommendedSalonDto
-{
-    public int SalonId { get; set; }
-    public string SalonName { get; set; } = string.Empty;
-    public string? Address { get; set; }
-    public string? Description { get; set; }
-    public string? ImageUrl { get; set; }
-    public int OwnerId { get; set; }
-
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
-
-    public double AverageRating { get; set; }
-    public int ReviewCount { get; set; }
-    public int CampaignCount { get; set; }
-    public int ServiceCount { get; set; }
-
-    public double DistanceKm { get; set; }
-    public double RecommendationScore { get; set; }
-    public string RecommendationReason { get; set; } = string.Empty;
 }
