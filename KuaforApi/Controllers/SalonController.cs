@@ -86,7 +86,7 @@ public class SalonController : ControllerBase
         return Ok(nearby);
     }
 
-    // YENİ: Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
+    // Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
     [HttpGet("recommended")]
     public async Task<IActionResult> GetRecommendedSalons(
         [FromQuery] double? latitude,
@@ -137,26 +137,26 @@ public class SalonController : ControllerBase
             int reviewCount = await _context.Reviews
                 .CountAsync(r => r.SalonId == salon.Id);
 
-            int campaignCount = await _context.Campaigns
-                .CountAsync(c => c.SalonId == salon.Id);
-
             int serviceCount = await _context.Services
                 .CountAsync(s => s.SalonId == salon.Id);
 
+            // Render tarafında Campaigns tablosu/modeli hata verdiği için
+            // kampanya puanını şimdilik devre dışı bırakıyoruz.
+            int campaignCount = 0;
+
             double ratingScore = averageRating * 20;
-
             double reviewScore = Math.Min(reviewCount * 5, 100);
-
-            double campaignScore = campaignCount > 0 ? 100 : 0;
-
+            double campaignScore = 0;
             double serviceMatchScore = 50;
 
             if (!string.IsNullOrWhiteSpace(serviceName))
             {
+                string search = serviceName.ToLower();
+
                 bool hasMatchingService = await _context.Services
                     .AnyAsync(s =>
                         s.SalonId == salon.Id &&
-                        s.Name.ToLower().Contains(serviceName.ToLower()));
+                        s.Name.ToLower().Contains(search));
 
                 serviceMatchScore = hasMatchingService ? 100 : 20;
             }
