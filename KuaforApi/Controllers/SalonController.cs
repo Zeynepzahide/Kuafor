@@ -88,121 +88,24 @@ public class SalonController : ControllerBase
 
     // Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
     // Bu sürüm Render'da hata vermemesi için sadece Salons tablosunu kullanır.
+    // EN BASİT TEST SÜRÜMÜ
+    // Sadece Salons tablosunu kullanır.
     [HttpGet("recommended")]
-    public async Task<IActionResult> GetRecommendedSalons(
-        [FromQuery] double? latitude,
-        [FromQuery] double? longitude,
-        [FromQuery] string? serviceName)
+    public async Task<IActionResult> GetRecommendedSalons()
     {
         var salons = await _context.Salons
             .Select(s => new
             {
-                s.Id,
-                s.Name,
-                s.Address,
-                s.Description,
-                s.ImageUrl,
-                s.OwnerId,
-                s.Latitude,
-                s.Longitude
+                salonId = s.Id,
+                salonName = s.Name,
+                address = s.Address,
+                recommendationScore = 80,
+                recommendationReason = "Bu salon genel salon bilgilerine göre önerildi."
             })
+            .Take(10)
             .ToListAsync();
 
-        var recommendedSalons = new List<RecommendedSalonDto>();
-
-        foreach (var salon in salons)
-        {
-            double distanceKm = 0;
-            double distanceScore = 50;
-
-            if (latitude.HasValue &&
-                longitude.HasValue &&
-                salon.Latitude.HasValue &&
-                salon.Longitude.HasValue)
-            {
-                distanceKm = HaversineDistance(
-                    latitude.Value,
-                    longitude.Value,
-                    salon.Latitude.Value,
-                    salon.Longitude.Value
-                );
-
-                distanceScore = Math.Max(0, 100 - (distanceKm * 10));
-            }
-
-            double searchScore = 50;
-
-            if (!string.IsNullOrWhiteSpace(serviceName))
-            {
-                string search = serviceName.ToLower();
-
-                bool matchesSearch =
-                    (!string.IsNullOrWhiteSpace(salon.Name) &&
-                     salon.Name.ToLower().Contains(search)) ||
-                    (!string.IsNullOrWhiteSpace(salon.Description) &&
-                     salon.Description.ToLower().Contains(search)) ||
-                    (!string.IsNullOrWhiteSpace(salon.Address) &&
-                     salon.Address.ToLower().Contains(search));
-
-                searchScore = matchesSearch ? 100 : 40;
-            }
-
-            double profileScore = 0;
-
-            if (!string.IsNullOrWhiteSpace(salon.Name))
-                profileScore += 25;
-
-            if (!string.IsNullOrWhiteSpace(salon.Address))
-                profileScore += 25;
-
-            if (!string.IsNullOrWhiteSpace(salon.Description))
-                profileScore += 25;
-
-            if (!string.IsNullOrWhiteSpace(salon.ImageUrl))
-                profileScore += 25;
-
-            double finalScore =
-                (distanceScore * 0.50) +
-                (searchScore * 0.30) +
-                (profileScore * 0.20);
-
-            string reason = BuildSimpleRecommendationReason(
-                distanceKm,
-                salon.Name,
-                salon.Address,
-                salon.Description,
-                salon.ImageUrl,
-                serviceName
-            );
-
-            recommendedSalons.Add(new RecommendedSalonDto
-            {
-                SalonId = salon.Id,
-                SalonName = salon.Name,
-                Address = salon.Address,
-                Description = salon.Description,
-                ImageUrl = salon.ImageUrl,
-                OwnerId = salon.OwnerId,
-                Latitude = salon.Latitude,
-                Longitude = salon.Longitude,
-
-                AverageRating = 0,
-                ReviewCount = 0,
-                CampaignCount = 0,
-                ServiceCount = 0,
-
-                DistanceKm = Math.Round(distanceKm, 2),
-                RecommendationScore = Math.Round(finalScore, 2),
-                RecommendationReason = reason
-            });
-        }
-
-        var result = recommendedSalons
-            .OrderByDescending(x => x.RecommendationScore)
-            .Take(10)
-            .ToList();
-
-        return Ok(result);
+        return Ok(salons);
     }
 
     [HttpGet("{id}")]
