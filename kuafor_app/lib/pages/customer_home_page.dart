@@ -11,9 +11,12 @@ import '../screens/messages_screen.dart';
 import 'login_page.dart';
 import 'register_page.dart';
 import 'profile_page.dart';
+import '../models/recommended_salon_model.dart';
+import '../services/recommendation_service.dart';
 
 class CustomerHomePage extends StatefulWidget {
   final bool guestMode;
+
   const CustomerHomePage({super.key, this.guestMode = false});
 
   @override
@@ -21,6 +24,11 @@ class CustomerHomePage extends StatefulWidget {
 }
 
 class _CustomerHomePageState extends State<CustomerHomePage> {
+  final RecommendationService _recommendationService = RecommendationService();
+
+  List<RecommendedSalonModel> recommendedSalons = [];
+  bool isLoadingRecommendations = false;
+
   final _authService = AuthService();
   final _salonService = SalonService();
   final TextEditingController _searchController = TextEditingController();
@@ -38,6 +46,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   String _searchQuery = '';
 
   List<dynamic> get _visibleSalons => _salons;
+
   List<dynamic> get _filteredSalons {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) return _visibleSalons;
@@ -46,10 +55,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       final name = (salon['name'] ?? '').toString().toLowerCase();
       final address = (salon['address'] ?? '').toString().toLowerCase();
       final description = (salon['description'] ?? '').toString().toLowerCase();
+
       return name.contains(query) ||
           address.contains(query) ||
           description.contains(query);
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadRecommendedSalons();
+    _init();
   }
 
   @override
@@ -59,10 +76,28 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _init();
+  Future<void> loadRecommendedSalons() async {
+    setState(() {
+      isLoadingRecommendations = true;
+    });
+
+    try {
+      final result = await _recommendationService.getRecommendedSalons();
+
+      if (!mounted) return;
+
+      setState(() {
+        recommendedSalons = result;
+      });
+    } catch (e) {
+      debugPrint('Önerilen salonlar alınamadı: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingRecommendations = false;
+        });
+      }
+    }
   }
 
   Future<void> _init() async {
@@ -73,7 +108,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Future<void> _loadUser() async {
     final token = await _authService.getToken();
     if (token == null) return;
+
     final info = await _authService.getUserInfo(token);
+
     if (info != null && mounted) {
       setState(() {
         _userName = info['name'] ?? '';
@@ -85,31 +122,39 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Future<void> _loadLocation() async {
     setState(() => _loading = true);
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
       if (!serviceEnabled) {
         _locationError = 'Konum servisi kapalı';
         await _loadAllSalons();
         return;
       }
+
       LocationPermission permission = await Geolocator.checkPermission();
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
+
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         _locationError = 'Konum izni verilmedi';
         await _loadAllSalons();
         return;
       }
+
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 10),
         ),
       );
+
       _userLat = position.latitude;
       _userLng = position.longitude;
+
       await _loadNearbySalons();
     } catch (e) {
       _locationError = 'Konum alınamadı';
@@ -122,12 +167,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       await _loadAllSalons();
       return;
     }
+
     try {
       final salons = await _salonService.getNearbySalons(
         lat: _userLat!,
         lng: _userLng!,
         radius: 50.0,
       );
+
       if (mounted) {
         setState(() {
           _salons = salons;
@@ -143,6 +190,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Future<void> _loadAllSalons() async {
     try {
       final salons = await _salonService.getSalons();
+
       if (mounted) {
         setState(() {
           _salons = salons;
@@ -157,16 +205,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   void _openMap() {
     FocusScope.of(context).unfocus();
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (_) => SalonsMapScreen(
-              salons: _visibleSalons,
-              userLat: _userLat,
-              userLng: _userLng,
-              userId: _userId,
-            ),
+        builder: (_) => SalonsMapScreen(
+          salons: _visibleSalons,
+          userLat: _userLat,
+          userLng: _userLng,
+          userId: _userId,
+        ),
       ),
     );
   }
@@ -184,23 +232,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder:
-          (_) => _AuthBottomSheet(
-            onLogin: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
-            },
-            onRegister: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RegisterPage()),
-              );
-            },
-          ),
+      builder: (_) => _AuthBottomSheet(
+        onLogin: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+          );
+        },
+        onRegister: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RegisterPage()),
+          );
+        },
+      ),
     );
   }
 
@@ -213,13 +260,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     });
   }
 
-  // Profil sayfasından döndükten sonra isim/foto güncellenmiş olabilir
   Future<void> _openProfile() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ProfilePage()),
     );
-    // Profil sayfasından dönünce kullanıcı bilgilerini yenile
+
     await _loadUser();
   }
 
@@ -233,6 +279,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             _buildHeader(),
             _buildSearchBar(),
             _buildActionButtons(),
+            _buildRecommendedSalonSection(),
             _buildSalonList(),
           ],
         ),
@@ -251,7 +298,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Sol: Hoş geldiniz yazısı
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -273,41 +319,38 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               ),
             ],
           ),
-
-          // Sağ: Misafirse "Giriş Yap" butonu, değilse profil avatarı
           widget.guestMode
               ? TextButton(
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                style: TextButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  child: const Text(
+                    'Giriş Yap',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Giriş Yap',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              )
+                )
               : GestureDetector(
-                onTap: _openProfile,
-                child: _ProfileAvatar(
-                  name: _userName,
-                  imageUrl: _profileImageUrl,
+                  onTap: _openProfile,
+                  child: _ProfileAvatar(
+                    name: _userName,
+                    imageUrl: _profileImageUrl,
+                  ),
                 ),
-              ),
         ],
       ),
     );
@@ -342,21 +385,20 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               Icons.search_rounded,
               color: AppColors.accent,
             ),
-            suffixIcon:
-                _searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        _searchFocusNode.unfocus();
-                        setState(() => _searchQuery = '');
-                      },
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: AppColors.muted,
-                        size: 20,
-                      ),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      _searchFocusNode.unfocus();
+                      setState(() => _searchQuery = '');
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.muted,
+                      size: 20,
                     ),
+                  ),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
@@ -370,7 +412,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Widget _buildActionButtons() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
         children: [
           Row(
@@ -473,6 +515,146 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
+  Widget _buildRecommendedSalonSection() {
+    if (isLoadingRecommendations) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+      );
+    }
+
+    if (recommendedSalons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      height: 170,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.accent,
+                  size: 18,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Senin İçin Önerilen Salonlar',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: recommendedSalons.length,
+              itemBuilder: (context, index) {
+                final salon = recommendedSalons[index];
+
+                return Container(
+                  width: 270,
+                  margin: const EdgeInsets.only(right: 12, bottom: 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome_rounded,
+                              color: AppColors.accent,
+                              size: 19,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              salon.salonName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        salon.address,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Öneri Skoru: ${salon.recommendationScore.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Expanded(
+                        child: Text(
+                          salon.recommendationReason,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            height: 1.25,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSalonList() {
     return Expanded(
       child: Column(
@@ -534,24 +716,25 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               ),
             ),
           Expanded(
-            child:
-                _loading
-                    ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.accent),
-                    )
-                    : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount:
-                          _filteredSalons.isEmpty ? 1 : _filteredSalons.length,
-                      itemBuilder: (_, i) {
-                        if (_filteredSalons.isEmpty) {
-                          return _searchQuery.trim().isEmpty
-                              ? const _EmptySalonResult()
-                              : _EmptySearchResult(query: _searchQuery);
-                        }
-                        return _buildSalonCard(_filteredSalons[i]);
-                      },
-                    ),
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredSalons.isEmpty
+                        ? 1
+                        : _filteredSalons.length,
+                    itemBuilder: (_, i) {
+                      if (_filteredSalons.isEmpty) {
+                        return _searchQuery.trim().isEmpty
+                            ? const _EmptySalonResult()
+                            : _EmptySearchResult(query: _searchQuery);
+                      }
+
+                      return _buildSalonCard(_filteredSalons[i]);
+                    },
+                  ),
           ),
         ],
       ),
@@ -567,15 +750,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (_) => SalonDetailScreen(
-                  salonId: salonId,
-                  userId: _userId,
-                  salonName: name,
-                ),
+            builder: (_) => SalonDetailScreen(
+              salonId: salonId,
+              userId: _userId,
+              salonName: name,
+            ),
           ),
         );
       },
@@ -730,8 +913,6 @@ class _EmptySalonResult extends StatelessWidget {
   }
 }
 
-// ── Profil avatarı (header sağ köşe) ──────────────────────────────────────────
-
 class _ProfileAvatar extends StatelessWidget {
   final String name;
   final String imageUrl;
@@ -741,8 +922,13 @@ class _ProfileAvatar extends StatelessWidget {
   String get _initials {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
+
     final parts = trimmed.split(' ').where((e) => e.isNotEmpty).toList();
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+
     return parts[0][0].toUpperCase();
   }
 
@@ -770,23 +956,20 @@ class _ProfileAvatar extends StatelessWidget {
           width: 1.5,
         ),
       ),
-      child:
-          imageUrl.isEmpty
-              ? fallback
-              : ClipOval(
-                child: Image.network(
-                  imageUrl,
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => fallback,
-                ),
+      child: imageUrl.isEmpty
+          ? fallback
+          : ClipOval(
+              child: Image.network(
+                imageUrl,
+                width: 42,
+                height: 42,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => fallback,
               ),
+            ),
     );
   }
 }
-
-// ── Auth Bottom Sheet ──────────────────────────────────────────────────────────
 
 class _AuthBottomSheet extends StatelessWidget {
   final VoidCallback onLogin;
@@ -884,10 +1067,9 @@ class _AuthBottomSheet extends StatelessWidget {
   }
 }
 
-// ── Randevularım Sayfası ───────────────────────────────────────────────────────
-
 class _AppointmentsPage extends StatefulWidget {
   final int userId;
+
   const _AppointmentsPage({required this.userId});
 
   @override
@@ -907,9 +1089,11 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+
     final data = await _appointmentService.getCustomerAppointments(
       widget.userId,
     );
+
     setState(() {
       _appointments = data;
       _loading = false;
@@ -951,33 +1135,34 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
   Future<void> _cancel(int appointmentId) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder:
-          (_) => AlertDialog(
-            title: const Text('Randevuyu İptal Et'),
-            content: const Text(
-              'Bu randevuyu iptal etmek istediğinizden emin misiniz?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Hayır'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  'Evet, İptal Et',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
+      builder: (_) => AlertDialog(
+        title: const Text('Randevuyu İptal Et'),
+        content: const Text(
+          'Bu randevuyu iptal etmek istediğinizden emin misiniz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hayır'),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Evet, İptal Et',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
     );
+
     if (confirm != true) return;
 
     final result = await _appointmentService.cancelAppointment(
       appointmentId,
       widget.userId,
     );
+
     if (!mounted) return;
 
     if (result.success) {
@@ -1005,190 +1190,199 @@ class _AppointmentsPageState extends State<_AppointmentsPage> {
         ),
         elevation: 0,
       ),
-      body:
-          _loading
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            )
+          : _appointments.isEmpty
               ? const Center(
-                child: CircularProgressIndicator(color: AppColors.accent),
-              )
-              : _appointments.isEmpty
-              ? const Center(
-                child: Text(
-                  'Henüz randevunuz yok.',
-                  style: TextStyle(color: AppColors.muted),
-                ),
-              )
+                  child: Text(
+                    'Henüz randevunuz yok.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                )
               : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _appointments.length,
-                  itemBuilder: (context, i) {
-                    final a = _appointments[i];
-                    final status =
-                        (a['statusCode'] ??
-                                a['status'] ??
-                                a['Status'] ??
-                                'Pending')
-                            .toString();
-                    final salonName =
-                        (a['salonName'] ??
-                                a['SalonName'] ??
-                                a['salon']?['name'] ??
-                                a['Salon']?['Name'] ??
-                                '')
-                            .toString();
-                    final serviceName =
-                        (a['serviceName'] ??
-                                a['ServiceName'] ??
-                                a['service']?['name'] ??
-                                a['Service']?['Name'] ??
-                                '')
-                            .toString();
-                    final dateStr =
-                        (a['appointmentDate'] ?? a['AppointmentDate'] ?? '')
-                            as String;
-                    DateTime? date;
-                    try {
-                      date = DateTime.parse(dateStr).toLocal();
-                    } catch (_) {}
-                    final canCancel =
-                        status == 'Pending' ||
-                        status == 'Beklemede' ||
-                        status == 'Confirmed' ||
-                        status == 'Onaylandı';
+                  onRefresh: _load,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _appointments.length,
+                    itemBuilder: (context, i) {
+                      final a = _appointments[i];
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.12,
+                      final status =
+                          (a['statusCode'] ??
+                                  a['status'] ??
+                                  a['Status'] ??
+                                  'Pending')
+                              .toString();
+
+                      final salonName =
+                          (a['salonName'] ??
+                                  a['SalonName'] ??
+                                  a['salon']?['name'] ??
+                                  a['Salon']?['Name'] ??
+                                  '')
+                              .toString();
+
+                      final serviceName =
+                          (a['serviceName'] ??
+                                  a['ServiceName'] ??
+                                  a['service']?['name'] ??
+                                  a['Service']?['Name'] ??
+                                  '')
+                              .toString();
+
+                      final dateStr =
+                          (a['appointmentDate'] ?? a['AppointmentDate'] ?? '')
+                              as String;
+
+                      DateTime? date;
+
+                      try {
+                        date = DateTime.parse(dateStr).toLocal();
+                      } catch (_) {}
+
+                      final canCancel = status == 'Pending' ||
+                          status == 'Beklemede' ||
+                          status == 'Confirmed' ||
+                          status == 'Onaylandı';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
+                                  child: const Icon(
+                                    Icons.calendar_today_rounded,
+                                    color: AppColors.accent,
+                                    size: 22,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.calendar_today_rounded,
-                                  color: AppColors.accent,
-                                  size: 22,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      salonName.isEmpty
-                                          ? 'Salon bilgisi bekleniyor'
-                                          : salonName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                        color: AppColors.primary,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        salonName.isEmpty
+                                            ? 'Salon bilgisi bekleniyor'
+                                            : salonName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          color: AppColors.primary,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      serviceName.isEmpty
-                                          ? 'Hizmet bilgisi bekleniyor'
-                                          : serviceName,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.muted,
-                                      ),
-                                    ),
-                                    if (date != null) ...[
                                       const SizedBox(height: 3),
                                       Text(
-                                        '${date.day}.${date.month}.${date.year}'
-                                        '  ${date.hour.toString().padLeft(2, '0')}:'
-                                        '${date.minute.toString().padLeft(2, '0')}',
+                                        serviceName.isEmpty
+                                            ? 'Hizmet bilgisi bekleniyor'
+                                            : serviceName,
                                         style: const TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12,
                                           color: AppColors.muted,
                                         ),
                                       ),
+                                      if (date != null) ...[
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          '${date.day}.${date.month}.${date.year}'
+                                          '  ${date.hour.toString().padLeft(2, '0')}:'
+                                          '${date.minute.toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.muted,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(
+                                      status,
+                                    ).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    _statusLabel(status),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _statusColor(status),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (canCancel) ...[
+                              const SizedBox(height: 10),
+                              const Divider(
+                                height: 1,
+                                color: AppColors.border,
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(
-                                    status,
-                                  ).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _statusLabel(status),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: _statusColor(status),
+                              GestureDetector(
+                                onTap: () => _cancel(a['id'] as int),
+                                child: const Padding(
+                                  padding: EdgeInsets.only(top: 10),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.cancel_outlined,
+                                        size: 14,
+                                        color: Colors.red,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Randevuyu İptal Et',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ],
-                          ),
-                          if (canCancel) ...[
-                            const SizedBox(height: 10),
-                            const Divider(height: 1, color: AppColors.border),
-                            GestureDetector(
-                              onTap: () => _cancel(a['id'] as int),
-                              child: const Padding(
-                                padding: EdgeInsets.only(top: 10),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.cancel_outlined,
-                                      size: 14,
-                                      color: Colors.red,
-                                    ),
-                                    SizedBox(width: 6),
-                                    Text(
-                                      'Randevuyu İptal Et',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ],
-                        ],
-                      ),
-                    );
-                  },
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
     );
   }
 }
