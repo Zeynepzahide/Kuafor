@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
@@ -28,6 +30,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   List<RecommendedSalonModel> recommendedSalons = [];
   bool isLoadingRecommendations = false;
+  Timer? _recommendationDebounce;
 
   final _authService = AuthService();
   final _salonService = SalonService();
@@ -70,6 +73,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   @override
   void dispose() {
+    _recommendationDebounce?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -95,7 +99,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     });
 
     try {
-      final result = await _recommendationService.getRecommendedSalons();
+      final result = await _recommendationService.getRecommendedSalons(
+        latitude: _userLat,
+        longitude: _userLng,
+        serviceName: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+      );
 
       if (!mounted) return;
 
@@ -111,6 +119,19 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         });
       }
     }
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+    });
+
+    if (widget.guestMode) return;
+
+    _recommendationDebounce?.cancel();
+    _recommendationDebounce = Timer(const Duration(milliseconds: 600), () {
+      loadRecommendedSalons();
+    });
   }
 
   Future<void> _loadUser() async {
@@ -387,8 +408,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         child: TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,
-          onChanged: (value) => setState(() => _searchQuery = value),
-          onSubmitted: (_) => _searchFocusNode.unfocus(),
+          onChanged: _onSearchChanged,
+          onSubmitted: (_) {
+            _searchFocusNode.unfocus();
+
+            if (!widget.guestMode) {
+              loadRecommendedSalons();
+            }
+          },
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: 'Salon, semt veya hizmet ara',
@@ -403,7 +430,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     onPressed: () {
                       _searchController.clear();
                       _searchFocusNode.unfocus();
-                      setState(() => _searchQuery = '');
+
+                      setState(() {
+                        _searchQuery = '';
+                      });
+
+                      if (!widget.guestMode) {
+                        loadRecommendedSalons();
+                      }
                     },
                     icon: const Icon(
                       Icons.close_rounded,
@@ -738,9 +772,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _filteredSalons.isEmpty
-                        ? 1
-                        : _filteredSalons.length,
+                    itemCount:
+                        _filteredSalons.isEmpty ? 1 : _filteredSalons.length,
                     itemBuilder: (_, i) {
                       if (_filteredSalons.isEmpty) {
                         return _searchQuery.trim().isEmpty

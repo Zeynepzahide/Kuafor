@@ -10,8 +10,20 @@ class RecommendationService {
     ),
   );
 
-  Future<List<RecommendedSalonModel>> getRecommendedSalons() async {
-    final response = await _dio.get('/Salon/recommended');
+  Future<List<RecommendedSalonModel>> getRecommendedSalons({
+    double? latitude,
+    double? longitude,
+    String? serviceName,
+  }) async {
+    final response = await _dio.get(
+      '/Salon/recommended',
+      queryParameters: {
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (serviceName != null && serviceName.isNotEmpty)
+          'serviceName': serviceName,
+      },
+    );
 
     final List data = response.data;
 
