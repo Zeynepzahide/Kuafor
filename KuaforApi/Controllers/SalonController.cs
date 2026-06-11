@@ -77,7 +77,12 @@ public class SalonController : ControllerBase
                 s.Latitude,
                 s.Longitude,
                 s.averageRating,
-                DistanceKm = HaversineDistance(lat, lng, s.Latitude!.Value, s.Longitude!.Value)
+                DistanceKm = HaversineDistance(
+                    lat,
+                    lng,
+                    s.Latitude!.Value,
+                    s.Longitude!.Value
+                )
             })
             .Where(s => s.DistanceKm <= radius)
             .OrderBy(s => s.DistanceKm)
@@ -87,32 +92,152 @@ public class SalonController : ControllerBase
     }
 
     // Yapay zeka destekli / kural tabanlı salon öneri endpoint'i
-    // TEST SÜRÜMÜ: Veritabanına bağlanmaz.
-    // Önce Render'da endpoint'in sorunsuz çalışıp çalışmadığını görmek için kullanılır.
+    // Gerçek veritabanındaki salonları konum, puan, yorum ve hizmet uyumuna göre sıralar.
     [HttpGet("recommended")]
-    public IActionResult GetRecommendedSalons()
+    public async Task<IActionResult> GetRecommendedSalons(
+        [FromQuery] double? latitude,
+        [FromQuery] double? longitude,
+        [FromQuery] string? serviceName)
     {
-        var recommendedSalons = new List<object>
-        {
-            new
+        var salons = await _context.Salons
+            .Select(s => new
             {
-                salonId = 1,
-                salonName = "Test Kuaför",
-                address = "İstanbul",
-                recommendationScore = 85,
-                recommendationReason = "Bu salon test amaçlı önerildi."
-            },
-            new
-            {
-                salonId = 2,
-                salonName = "Önerilen Salon",
-                address = "İstanbul",
-                recommendationScore = 75,
-                recommendationReason = "Bu salon genel öneri algoritmasına göre listelendi."
-            }
-        };
+                s.Id,
+                s.Name,
+                s.Address,
+                s.Description,
+                s.ImageUrl,
+                s.OwnerId,
+                s.Latitude,
+                s.Longitude
+            })
+            .ToListAsync();
 
-        return Ok(recommendedSalons);
+        var recommendedSalons = new List<RecommendedSalonDto>();
+
+        foreach (var salon in salons)
+        {
+            double distanceKm = 0;
+            double distanceScore = 50;
+
+            if (latitude.HasValue &&
+                longitude.HasValue &&
+                salon.Latitude.HasValue &&
+                salon.Longitude.HasValue)
+            {
+                distanceKm = HaversineDistance(
+                    latitude.Value,
+                    longitude.Value,
+                    salon.Latitude.Value,
+                    salon.Longitude.Value
+                );
+
+                distanceScore = Math.Max(0, 100 - (distanceKm * 10));
+            }
+
+            double averageRating = 0;
+            int reviewCount = 0;
+
+            try
+            {
+                averageRating = await _context.Reviews
+                    .Where(r => r.SalonId == salon.Id)
+                    .Select(r => (double?)r.Rating)
+                    .AverageAsync() ?? 0;
+
+                reviewCount = await _context.Reviews
+                    .CountAsync(r => r.SalonId == salon.Id);
+            }
+            catch
+            {
+                averageRating = 0;
+                reviewCount = 0;
+            }
+
+            int serviceCount = 0;
+            double serviceMatchScore = 50;
+
+            try
+            {
+                serviceCount = await _context.Services
+                    .CountAsync(s => s.SalonId == salon.Id);
+
+                if (!string.IsNullOrWhiteSpace(serviceName))
+                {
+                    string search = serviceName.ToLower();
+
+                    bool hasMatchingService = await _context.Services
+                        .AnyAsync(s =>
+                            s.SalonId == salon.Id &&
+                            s.Name.ToLower().Contains(search));
+
+                    serviceMatchScore = hasMatchingService ? 100 : 20;
+                }
+            }
+            catch
+            {
+                serviceCount = 0;
+                serviceMatchScore = 50;
+            }
+
+            double ratingScore = averageRating * 20;
+            double reviewScore = Math.Min(reviewCount * 5, 100);
+
+            double profileScore = 0;
+
+            if (!string.IsNullOrWhiteSpace(salon.Name))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.Address))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.Description))
+                profileScore += 25;
+
+            if (!string.IsNullOrWhiteSpace(salon.ImageUrl))
+                profileScore += 25;
+
+            double finalScore =
+                (distanceScore * 0.40) +
+                (ratingScore * 0.25) +
+                (reviewScore * 0.15) +
+                (serviceMatchScore * 0.15) +
+                (profileScore * 0.05);
+
+            string reason = BuildRecommendationReason(
+                distanceKm,
+                averageRating,
+                reviewCount,
+                serviceMatchScore,
+                serviceName
+            );
+
+            recommendedSalons.Add(new RecommendedSalonDto
+            {
+                SalonId = salon.Id,
+                SalonName = salon.Name,
+                Address = salon.Address,
+                Description = salon.Description,
+                ImageUrl = salon.ImageUrl,
+                OwnerId = salon.OwnerId,
+                Latitude = salon.Latitude,
+                Longitude = salon.Longitude,
+                AverageRating = Math.Round(averageRating, 1),
+                ReviewCount = reviewCount,
+                CampaignCount = 0,
+                ServiceCount = serviceCount,
+                DistanceKm = Math.Round(distanceKm, 2),
+                RecommendationScore = Math.Round(finalScore, 2),
+                RecommendationReason = reason
+            });
+        }
+
+        var result = recommendedSalons
+            .OrderByDescending(x => x.RecommendationScore)
+            .Take(10)
+            .ToList();
+
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
@@ -351,6 +476,33 @@ public class SalonController : ControllerBase
     {
         return deg * Math.PI / 180.0;
     }
+
+    private static string BuildRecommendationReason(
+        double distanceKm,
+        double averageRating,
+        int reviewCount,
+        double serviceMatchScore,
+        string? serviceName)
+    {
+        var reasons = new List<string>();
+
+        if (distanceKm > 0 && distanceKm <= 5)
+            reasons.Add("konumuna yakın");
+
+        if (averageRating >= 4)
+            reasons.Add("puanı yüksek");
+
+        if (reviewCount >= 5)
+            reasons.Add("kullanıcılar tarafından sık değerlendirilen bir salon");
+
+        if (!string.IsNullOrWhiteSpace(serviceName) && serviceMatchScore >= 100)
+            reasons.Add($"{serviceName} hizmetiyle uyumlu");
+
+        if (!reasons.Any())
+            return "Genel salon bilgilerine göre önerildi.";
+
+        return "Bu salon sana önerildi çünkü " + string.Join(", ", reasons) + ".";
+    }
 }
 
 public class UpdateSalonRequest
@@ -370,4 +522,26 @@ public class ServiceDto
     public decimal Price { get; set; }
     public int DurationMinutes { get; set; }
     public string? StylistName { get; set; }
+}
+
+public class RecommendedSalonDto
+{
+    public int SalonId { get; set; }
+    public string SalonName { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? Description { get; set; }
+    public string? ImageUrl { get; set; }
+    public int OwnerId { get; set; }
+
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+
+    public double AverageRating { get; set; }
+    public int ReviewCount { get; set; }
+    public int CampaignCount { get; set; }
+    public int ServiceCount { get; set; }
+
+    public double DistanceKm { get; set; }
+    public double RecommendationScore { get; set; }
+    public string RecommendationReason { get; set; } = string.Empty;
 }

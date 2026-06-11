@@ -65,7 +65,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override
   void initState() {
     super.initState();
-    loadRecommendedSalons();
     _init();
   }
 
@@ -76,7 +75,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     super.dispose();
   }
 
+  Future<void> _init() async {
+    if (!widget.guestMode) {
+      await _loadUser();
+    }
+
+    await _loadLocation();
+
+    if (!widget.guestMode) {
+      await loadRecommendedSalons();
+    }
+  }
+
   Future<void> loadRecommendedSalons() async {
+    if (widget.guestMode) return;
+
     setState(() {
       isLoadingRecommendations = true;
     });
@@ -98,11 +111,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         });
       }
     }
-  }
-
-  Future<void> _init() async {
-    if (!widget.guestMode) await _loadUser();
-    await _loadLocation();
   }
 
   Future<void> _loadUser() async {
@@ -267,6 +275,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
 
     await _loadUser();
+
+    if (!widget.guestMode) {
+      await loadRecommendedSalons();
+    }
   }
 
   @override
@@ -516,6 +528,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildRecommendedSalonSection() {
+    if (widget.guestMode) {
+      return const SizedBox.shrink();
+    }
+
     if (isLoadingRecommendations) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
